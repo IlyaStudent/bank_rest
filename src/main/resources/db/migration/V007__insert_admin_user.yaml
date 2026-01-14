@@ -1,0 +1,42 @@
+databaseChangeLog:
+  - changeSet:
+      id: insert-admin-user
+      author: developer
+      changes:
+        - insert:
+            tableName: users
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 1
+              - column:
+                  name: username
+                  value: admin
+              - column:
+                  name: email
+                  value: admin@bankcards.com
+              - column:
+                  name: password
+                  value: $2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy
+              - column:
+                  name: created_at
+                  valueDate: now()
+              - column:
+                  name: updated_at
+                  valueDate: now()
+        - insert:
+            tableName: user_roles
+            columns:
+              - column:
+                  name: user_id
+                  valueNumeric: 1
+              - column:
+                  name: role_id
+                  valueNumeric: 1
+      rollback:
+        - delete:
+            tableName: user_roles
+            where: user_id = 1
+        - delete:
+            tableName: users
+            where: username = 'admin'

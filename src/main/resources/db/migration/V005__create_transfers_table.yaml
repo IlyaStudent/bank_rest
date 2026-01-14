@@ -1,0 +1,72 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-transfers-table
+      author: developer
+      changes:
+        - createTable:
+            tableName: transfers
+            columns:
+              - column:
+                  name: id
+                  type: BIGSERIAL
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_transfers
+              - column:
+                  name: source_card_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: destination_card_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: amount
+                  type: DECIMAL(19, 2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: time_stamp
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: description
+                  type: TEXT
+        - addForeignKeyConstraint:
+            baseTableName: transfers
+            baseColumnNames: source_card_id
+            constraintName: fk_transfers_source_card
+            referencedTableName: cards
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: transfers
+            baseColumnNames: destination_card_id
+            constraintName: fk_transfers_destination_card
+            referencedTableName: cards
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - createIndex:
+            indexName: idx_transfer_source_card_id
+            tableName: transfers
+            columns:
+              - column:
+                  name: source_card_id
+        - createIndex:
+            indexName: idx_transfer_destination_card_id
+            tableName: transfers
+            columns:
+              - column:
+                  name: destination_card_id
+      rollback:
+        - dropTable:
+            tableName: transfers

@@ -1,0 +1,15 @@
+databaseChangeLog:
+  - include:
+      file: db/migration/V001__create_roles_table.yaml
+  - include:
+      file: db/migration/V002__create_users_table.yaml
+  - include:
+      file: db/migration/V003__create_user_roles_table.yaml
+  - include:
+      file: db/migration/V004__create_cards_table.yaml
+  - include:
+      file: db/migration/V005__create_transfers_table.yaml
+  - include:
+      file: db/migration/V006__insert_initial_roles.yaml
+  - include:
+      file: db/migration/V007__insert_admin_user.yaml
