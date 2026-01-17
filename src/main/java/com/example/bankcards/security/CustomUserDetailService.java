@@ -1,7 +1,6 @@
 package com.example.bankcards.security;
 
 import com.example.bankcards.entity.User;
-import com.example.bankcards.exception.UserNotFoundException;
 import com.example.bankcards.repository.UserRepository;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
