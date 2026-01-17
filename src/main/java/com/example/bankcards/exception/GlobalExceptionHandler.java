@@ -1,7 +1,7 @@
 package com.example.bankcards.exception;
 
 import com.example.bankcards.dto.error.ErrorResponse;
-import com.example.bankcards.util.ApiConstants;
+import com.example.bankcards.util.constants.ApiConstants;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;

@@ -1,4 +1,4 @@
-package com.example.bankcards.util;
+package com.example.bankcards.util.constants;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
