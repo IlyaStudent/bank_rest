@@ -2,15 +2,15 @@ package com.example.bankcards.exception;
 
 import com.example.bankcards.dto.error.ErrorResponse;
 import com.example.bankcards.util.constants.ApiConstants;
+import com.example.bankcards.util.constants.ApiErrorMessage;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.Instant;
 import java.util.Arrays;
@@ -19,188 +19,100 @@ import java.util.Map;
 import java.util.Objects;
 
 @Slf4j
-@ControllerAdvice
+@RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler
-    @ResponseBody
-    protected ResponseEntity<ErrorResponse> handleException(
-            Exception ex,
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleResourceNotFound(
+            ResourceNotFoundException ex,
             HttpServletRequest request
     ) {
-        logStackTrace(ex);
-        String path = request.getRequestURI();
-
-        ErrorResponse errorResponse = new ErrorResponse(
-                Instant.now(),
-                HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase(),
-                ex.getMessage(),
-                path
-        );
-
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(errorResponse);
+        logError(ex);
+        return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage(), request);
     }
 
-    @ExceptionHandler(CardBlockedException.class)
-    @ResponseBody
-    protected ResponseEntity<ErrorResponse> handleCardBlockedException(
-            CardBlockedException ex,
+    @ExceptionHandler(ResourceExistsException.class)
+    public ResponseEntity<ErrorResponse> handleResourceExists(
+            ResourceExistsException ex,
             HttpServletRequest request
     ) {
-        logStackTrace(ex);
-        String path = request.getRequestURI();
-
-        ErrorResponse errorResponse = new ErrorResponse(
-                Instant.now(),
-                HttpStatus.FORBIDDEN.value(),
-                HttpStatus.FORBIDDEN.getReasonPhrase(),
-                ex.getMessage(),
-                path
-        );
-
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(errorResponse);
+        logError(ex);
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request);
     }
 
-    @ExceptionHandler(CardExpiredException.class)
-    @ResponseBody
-    protected ResponseEntity<ErrorResponse> handleCardExpiredException(
-            CardExpiredException ex,
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ErrorResponse> handleBusinessException(
+            BusinessException ex,
             HttpServletRequest request
     ) {
-        logStackTrace(ex);
-        String path = request.getRequestURI();
-
-        ErrorResponse errorResponse = new ErrorResponse(
-                Instant.now(),
-                HttpStatus.GONE.value(),
-                HttpStatus.GONE.getReasonPhrase(),
-                ex.getMessage(),
-                path
-        );
-
-        return ResponseEntity.status(HttpStatus.GONE)
-                .body(errorResponse);
+        logError(ex);
+        return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), request);
     }
 
-    @ExceptionHandler(CardNotFoundException.class)
-    @ResponseBody
-    protected ResponseEntity<ErrorResponse> handleCardNotFoundException(
-            CardNotFoundException ex,
+    @ExceptionHandler(AuthException.class)
+    public ResponseEntity<ErrorResponse> handleAuthException(
+            AuthException ex,
             HttpServletRequest request
     ) {
-        logStackTrace(ex);
-        String path = request.getRequestURI();
-
-        ErrorResponse errorResponse = new ErrorResponse(
-                Instant.now(),
-                HttpStatus.NOT_FOUND.value(),
-                HttpStatus.NOT_FOUND.getReasonPhrase(),
-                ex.getMessage(),
-                path
-        );
-
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(errorResponse);
-    }
-
-    @ExceptionHandler(InsufficientFundsException.class)
-    @ResponseBody
-    protected ResponseEntity<ErrorResponse> handleInsufficientFundsException(
-            InsufficientFundsException ex,
-            HttpServletRequest request
-    ) {
-        logStackTrace(ex);
-        String path = request.getRequestURI();
-
-        ErrorResponse errorResponse = new ErrorResponse(
-                Instant.now(),
-                HttpStatus.PAYMENT_REQUIRED.value(),
-                HttpStatus.PAYMENT_REQUIRED.getReasonPhrase(),
-                ex.getMessage(),
-                path
-        );
-
-        return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED)
-                .body(errorResponse);
-    }
-
-    @ExceptionHandler(UserNotFoundException.class)
-    @ResponseBody
-    protected ResponseEntity<ErrorResponse> handleUserNotFoundException(
-            UserNotFoundException ex,
-            HttpServletRequest request
-    ) {
-        logStackTrace(ex);
-        String path = request.getRequestURI();
-
-        ErrorResponse errorResponse = new ErrorResponse(
-                Instant.now(),
-                HttpStatus.NOT_FOUND.value(),
-                HttpStatus.NOT_FOUND.getReasonPhrase(),
-                ex.getMessage(),
-                path
-        );
-
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(errorResponse);
+        logError(ex);
+        return buildResponse(HttpStatus.UNAUTHORIZED, ex.getMessage(), request);
     }
 
     @ExceptionHandler(EncryptionException.class)
-    @ResponseBody
-    protected ResponseEntity<ErrorResponse> handleEncryptionException(
+    public ResponseEntity<ErrorResponse> handleEncryptionException(
             EncryptionException ex,
             HttpServletRequest request
     ) {
-        logStackTrace(ex);
-        String path = request.getRequestURI();
-
-        ErrorResponse errorResponse = new ErrorResponse(
-                Instant.now(),
-                HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase(),
-                ex.getMessage(),
-                path
-        );
-
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(errorResponse);
+        logError(ex);
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage(), request);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    @ResponseBody
-    protected ResponseEntity<ErrorResponse> handleMethodArgumentNotValidException(
+    public ResponseEntity<ErrorResponse> handleValidationException(
             MethodArgumentNotValidException ex,
             HttpServletRequest request
     ) {
-        logStackTrace(ex);
-        String path = request.getRequestURI();
+        logError(ex);
 
         Map<String, String> errors = new HashMap<>();
         for (FieldError error : ex.getBindingResult().getFieldErrors()) {
-            String errorMessage = error.getDefaultMessage();
-            errors.put(error.getField(), errorMessage);
+            errors.put(error.getField(), error.getDefaultMessage());
         }
 
-        ErrorResponse errorResponse = new ErrorResponse(
-                Instant.now(),
-                HttpStatus.BAD_REQUEST.value(),
-                HttpStatus.BAD_REQUEST.getReasonPhrase(),
-                errors.toString(),
-                path
-        );
-
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(errorResponse);
+        return buildResponse(HttpStatus.BAD_REQUEST, errors.toString(), request);
     }
 
-    private void logStackTrace(Exception ex) {
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponse> handleGenericException(
+            Exception ex,
+            HttpServletRequest request
+    ) {
+        logError(ex);
+        return buildResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                ApiErrorMessage.UNEXPECTED_ERROR.getMessage(),
+                request
+        );
+    }
+
+    private ResponseEntity<ErrorResponse> buildResponse(
+            HttpStatus status,
+            String message,
+            HttpServletRequest request
+    ) {
+        ErrorResponse errorResponse = new ErrorResponse(
+                Instant.now(),
+                status.value(),
+                status.getReasonPhrase(),
+                message,
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(status).body(errorResponse);
+    }
+
+    private void logError(Exception ex) {
         StringBuilder stackTrace = new StringBuilder();
-
         stackTrace.append(ApiConstants.ANSI_RED);
-
         stackTrace.append(ex.getMessage()).append(ApiConstants.BREAK_LINE);
 
         if (Objects.nonNull(ex.getCause())) {
