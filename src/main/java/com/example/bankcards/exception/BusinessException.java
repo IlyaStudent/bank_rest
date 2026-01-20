@@ -37,4 +37,8 @@ public class BusinessException extends RuntimeException {
     public static BusinessException passwordsDoNotMatch() {
         return new BusinessException(ApiErrorMessage.PASSWORDS_DO_NOT_MATCH.getMessage());
     }
+
+    public static BusinessException invalidRole(String roleName) {
+        return new BusinessException(ApiErrorMessage.INVALID_ROLE.getMessage(roleName));
+    }
 }

@@ -24,6 +24,7 @@ public enum ApiErrorMessage {
     CARD_BLOCKED("Card with id %s is blocked"),
     CARD_EXPIRED("Card with id %s has expired"),
     INVALID_CARD_STATUS("Invalid card status: %s"),
+    INVALID_ROLE("Invalid role: %s"),
     SAME_CARD_TRANSFER("Cannot transfer to the same card"),
     INVALID_TRANSFER_AMOUNT("Transfer amount must be positive"),
     PASSWORDS_DO_NOT_MATCH("Passwords must be equals"),

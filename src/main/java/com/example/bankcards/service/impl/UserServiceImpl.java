@@ -5,6 +5,7 @@ import com.example.bankcards.dto.user.UserDto;
 import com.example.bankcards.entity.Role;
 import com.example.bankcards.entity.RoleType;
 import com.example.bankcards.entity.User;
+import com.example.bankcards.exception.BusinessException;
 import com.example.bankcards.exception.ResourceExistsException;
 import com.example.bankcards.exception.ResourceNotFoundException;
 import com.example.bankcards.mapper.UserMapper;
@@ -49,23 +50,7 @@ public class UserServiceImpl implements UserService {
 
         Set<String> requestedRoles = createUserRequest.getRoles();
 
-        if (requestedRoles == null || requestedRoles.isEmpty()) {
-            Role defaultRole = roleRepository.findByName(RoleType.USER)
-                    .orElseThrow(() -> ResourceNotFoundException.role(RoleType.USER));
-            user.getRoles().add(defaultRole);
-        } else {
-            Set<Role> roles = requestedRoles
-                    .stream()
-                    .map(roleName -> {
-                        RoleType roleType = RoleType.valueOf(roleName);
-                        return roleRepository.findByName(roleType)
-                                .orElseThrow(() -> ResourceNotFoundException.role(roleType));
-                    })
-                    .collect(Collectors.toSet());
-
-            user.setRoles(roles);
-        }
-
+        setUserRoles(requestedRoles, user);
 
         user = userRepository.save(user);
         return userMapper.toDto(user);
@@ -123,7 +108,6 @@ public class UserServiceImpl implements UserService {
         if (newPassword != null && !newPassword.isBlank()) {
             user.setPassword(passwordEncoder.encode(newPassword));
         }
-
         user = userRepository.save(user);
 
         return userMapper.toDto(user);
@@ -149,5 +133,30 @@ public class UserServiceImpl implements UserService {
         user = userRepository.save(user);
 
         return userMapper.toDto(user);
+    }
+
+    private void setUserRoles(Set<String> requestedRoles, User user) {
+        if (requestedRoles == null || requestedRoles.isEmpty()) {
+            Role defaultRole = roleRepository.findByName(RoleType.USER)
+                    .orElseThrow(() -> ResourceNotFoundException.role(RoleType.USER));
+            user.getRoles().add(defaultRole);
+        } else {
+            Set<Role> roles = requestedRoles
+                    .stream()
+                    .map(roleName -> {
+                        RoleType roleType;
+                        try {
+                            roleType = RoleType.valueOf(roleName);
+                        } catch (IllegalArgumentException e) {
+                            throw BusinessException.invalidRole(roleName);
+                        }
+
+                        return roleRepository.findByName(roleType)
+                                .orElseThrow(() -> ResourceNotFoundException.role(roleType));
+                    })
+                    .collect(Collectors.toSet());
+
+            user.setRoles(roles);
+        }
     }
 }
