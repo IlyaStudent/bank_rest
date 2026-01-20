@@ -38,7 +38,7 @@ public class Transfer {
     private BigDecimal amount;
 
     @Column(nullable = false)
-    private Instant timeStamp;
+    private Instant timestamp;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -49,7 +49,7 @@ public class Transfer {
 
     @PrePersist
     protected void onCreate() {
-        timeStamp = Instant.now();
+        timestamp = Instant.now();
         if (status == null) {
             status = TransferStatus.PENDING;
         }

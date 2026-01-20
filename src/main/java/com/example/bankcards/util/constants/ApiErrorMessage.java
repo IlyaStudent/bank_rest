@@ -26,6 +26,7 @@ public enum ApiErrorMessage {
     INVALID_CARD_STATUS("Invalid card status: %s"),
     SAME_CARD_TRANSFER("Cannot transfer to the same card"),
     INVALID_TRANSFER_AMOUNT("Transfer amount must be positive"),
+    PASSWORDS_DO_NOT_MATCH("Passwords must be equals"),
 
     // Authentication errors (401)
     INVALID_CREDENTIALS("Invalid username or password"),

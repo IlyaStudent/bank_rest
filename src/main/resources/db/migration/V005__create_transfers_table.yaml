@@ -29,7 +29,7 @@ databaseChangeLog:
                   constraints:
                     nullable: false
               - column:
-                  name: time_stamp
+                  name: timestamp
                   type: TIMESTAMP
                   constraints:
                     nullable: false

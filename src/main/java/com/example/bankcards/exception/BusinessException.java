@@ -33,4 +33,8 @@ public class BusinessException extends RuntimeException {
     public static BusinessException invalidTransferAmount() {
         return new BusinessException(ApiErrorMessage.INVALID_TRANSFER_AMOUNT.getMessage());
     }
+
+    public static BusinessException passwordsDoNotMatch() {
+        return new BusinessException(ApiErrorMessage.PASSWORDS_DO_NOT_MATCH.getMessage());
+    }
 }

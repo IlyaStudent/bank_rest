@@ -46,7 +46,7 @@ public class EncryptionUtil {
 
             return Base64.getEncoder().encodeToString(combined);
         } catch (Exception e) {
-            throw new EncryptionException("Encryption failed", e);
+            throw EncryptionException.encryptionFailed(e);
         }
     }
 
@@ -67,7 +67,7 @@ public class EncryptionUtil {
             return new String(decrypted, StandardCharsets.UTF_8);
 
         } catch (Exception e) {
-            throw new EncryptionException("Decryption failed", e);
+            throw EncryptionException.decryptionFailed(e);
         }
     }
 
@@ -78,7 +78,7 @@ public class EncryptionUtil {
             SecretKey key = keyGen.generateKey();
             return Base64.getEncoder().encodeToString(key.getEncoded());
         } catch (Exception e) {
-            throw new EncryptionException("Key generation failed", e);
+            throw EncryptionException.encryptionFailed(e);
         }
     }
 }

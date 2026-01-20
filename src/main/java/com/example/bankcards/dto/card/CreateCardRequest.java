@@ -1,7 +1,9 @@
 package com.example.bankcards.dto.card;
 
+import com.example.bankcards.validation.CardNumber;
+import com.example.bankcards.validation.Cvv;
+import com.example.bankcards.validation.ExpiryDate;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -11,16 +13,17 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class CreateCardRequest {
     @NotBlank
+    @CardNumber
     private String cardNumber;
 
     @NotBlank
     private String holderName;
 
     @NotBlank
-    @Pattern(regexp = "^(0[1-9]|1[0-2])/[0-9]{2}$")
+    @ExpiryDate
     private String expiryDate;
 
     @NotBlank
-    @Pattern(regexp = "^\\d{3}$")
+    @Cvv
     private String cvv;
 }

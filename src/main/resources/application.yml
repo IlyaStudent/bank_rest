@@ -32,6 +32,8 @@ server:
   port: 8080
 
 app:
+  encryption:
+    key: mAwbivjC09yqaqa8g+xvYu737OXw8W9ppmoUjTyY41Y=
   jwt:
     secret: 89b49V/UHLCm2kMURdM8pCe0zmHfc5Tf/L6cMoJsnF0=
     expiration: 3600000

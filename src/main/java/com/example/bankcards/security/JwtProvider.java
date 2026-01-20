@@ -13,6 +13,8 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.HashMap;
@@ -27,7 +29,7 @@ public class JwtProvider {
     private final Long jwtValidityInMilliseconds;
 
     public JwtProvider(@Value("${app.jwt.secret}") String secret,
-                       @Value("${app.jwt.expiration:3600000}") long jwtValidityInMilliseconds) {
+                       @Value("${app.jwt.expiration}") long jwtValidityInMilliseconds) {
         this.secretKey = getKey(secret);
         this.jwtValidityInMilliseconds = jwtValidityInMilliseconds;
     }
@@ -98,6 +100,11 @@ public class JwtProvider {
                 .expiration(new Date(System.currentTimeMillis() + jwtValidityInMilliseconds))
                 .signWith(secretKey, Jwts.SIG.HS512)
                 .compact();
+    }
+
+    @NonNull
+    public Instant getTokenExpiration() {
+        return Instant.now().plus(Duration.ofMillis(jwtValidityInMilliseconds));
     }
 }
 
