@@ -1,10 +1,12 @@
 package com.example.bankcards.service.impl;
 
 import com.example.bankcards.dto.card.CardResponse;
+import com.example.bankcards.dto.card.CardUpdateRequest;
 import com.example.bankcards.dto.card.CreateCardRequest;
 import com.example.bankcards.entity.Card;
 import com.example.bankcards.entity.CardStatus;
 import com.example.bankcards.entity.User;
+import com.example.bankcards.exception.BusinessException;
 import com.example.bankcards.exception.ResourceNotFoundException;
 import com.example.bankcards.mapper.CardMapper;
 import com.example.bankcards.repository.CardRepository;
@@ -17,7 +19,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
@@ -76,19 +77,21 @@ public class CardServiceImpl implements CardService {
     }
 
     @Override
-    public CardResponse updateCardStatus(Long cardId, CardStatus cardStatus) {
+    public CardResponse updateCard(Long cardId, CardUpdateRequest cardUpdateRequest) {
         Card card = cardRepository.findById(cardId)
                 .orElseThrow(() -> ResourceNotFoundException.card(cardId));
-        card.setStatus(cardStatus);
 
-        card = cardRepository.save(card);
+        updateCardStatus(card, cardUpdateRequest.getStatus());
 
         return cardMapper.toResponse(card);
     }
 
     @Override
     public CardResponse blockCard(Long cardId) {
-        return updateCardStatus(cardId, CardStatus.BLOCKED);
+        Card card = cardRepository.findById(cardId)
+                .orElseThrow(() -> ResourceNotFoundException.card(cardId));
+
+        return updateCardStatus(card, CardStatus.BLOCKED.name());
     }
 
     @Override
@@ -99,11 +102,17 @@ public class CardServiceImpl implements CardService {
         cardRepository.deleteById(cardId);
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public BigDecimal getCardBalance(Long cardId) {
-        return cardRepository.findById(cardId)
-                .orElseThrow(() -> ResourceNotFoundException.card(cardId))
-                .getBalance();
+    private CardResponse updateCardStatus(Card card, String requestedCardStatus) {
+        CardStatus cardStatus;
+        try {
+            cardStatus = CardStatus.valueOf(requestedCardStatus);
+        } catch (IllegalArgumentException e) {
+            throw BusinessException.invalidCardStatus(requestedCardStatus);
+        }
+        card.setStatus(cardStatus);
+
+        card = cardRepository.save(card);
+
+        return cardMapper.toResponse(card);
     }
 }

@@ -51,3 +51,20 @@ logging:
     org.springframework.security: DEBUG
     org.hibernate.SQL: DEBUG
 
+end:
+  point:
+    id: /{id}
+
+    auth: /api/auth
+    register: /register
+    login: /login
+
+    cards: /api/cards
+    block: /{id}/block
+
+    transfers: /api/transfers
+
+    users: /api/users
+    assign:
+      role: /{id}/roles
+

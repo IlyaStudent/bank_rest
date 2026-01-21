@@ -10,6 +10,4 @@ public interface TransferService {
     TransferResponse transferMoney(@NotNull TransferRequest transferRequest);
 
     Page<TransferResponse> getTransferHistory(@NotNull Long userId, Pageable pageable);
-
-    void validateCardForTransfer(@NotNull Long cardId);
 }

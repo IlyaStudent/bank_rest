@@ -18,7 +18,7 @@ public interface UserService {
 
     UserDto updateUser(@NotNull Long userId, @NotNull CreateUserRequest createUserRequest);
 
-    void deleteUser(@NotNull Long id);
+    void deleteUser(@NotNull Long userId);
 
-    UserDto assignRole(@NotNull Long id, @NotNull RoleType role);
+    UserDto assignRole(@NotNull Long userId, @NotNull RoleType role);
 }

@@ -81,14 +81,6 @@ public class TransferServiceImpl implements TransferService {
                 .map(transferMapper::toResponse);
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public void validateCardForTransfer(Long cardId) {
-        Card card = cardRepository.findById(cardId)
-                .orElseThrow(() -> ResourceNotFoundException.card(cardId));
-        validateCardStatus(card);
-    }
-
     private void validateCardStatus(Card card) {
         if (card.getStatus() == CardStatus.BLOCKED) {
             throw BusinessException.cardBlocked(card.getId());
