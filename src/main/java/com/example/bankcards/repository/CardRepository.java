@@ -32,7 +32,7 @@ public interface CardRepository extends JpaRepository<Card, Long> {
             Pageable pageable
     );
 
-    Page<Card> findByOwnerIdAndBalanceGreaterThen(
+    Page<Card> findByOwnerIdAndBalanceGreaterThan(
             Long ownerId,
             BigDecimal balance,
             Pageable pageable
