@@ -1,6 +1,7 @@
 package com.example.bankcards.controller;
 
 import com.example.bankcards.dto.user.CreateUserRequest;
+import com.example.bankcards.dto.user.UpdateUserRequest;
 import com.example.bankcards.dto.user.UserDto;
 import com.example.bankcards.entity.RoleType;
 import com.example.bankcards.service.UserService;
@@ -75,10 +76,10 @@ public class UserController {
     })
     @PutMapping("${end.point.id}")
     public UserDto updateUser(
-            @RequestBody @Valid CreateUserRequest createUserRequest,
+            @RequestBody @Valid UpdateUserRequest updateUserRequest,
             @Parameter(description = "User ID") @PathVariable(name = "id") Long userId
     ) {
-        return userService.updateUser(userId, createUserRequest);
+        return userService.updateUser(userId, updateUserRequest);
     }
 
     @Operation(summary = "Delete user", description = "Deletes a user by ID")

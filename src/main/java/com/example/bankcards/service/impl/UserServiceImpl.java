@@ -1,6 +1,7 @@
 package com.example.bankcards.service.impl;
 
 import com.example.bankcards.dto.user.CreateUserRequest;
+import com.example.bankcards.dto.user.UpdateUserRequest;
 import com.example.bankcards.dto.user.UserDto;
 import com.example.bankcards.entity.Role;
 import com.example.bankcards.entity.RoleType;
@@ -83,31 +84,42 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public UserDto updateUser(Long userId, CreateUserRequest createUserRequest) {
+    public UserDto updateUser(Long userId, UpdateUserRequest updateUserRequest) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> ResourceNotFoundException.user(userId));
 
-        String newUsername = createUserRequest.getUsername();
-        String newEmail = createUserRequest.getEmail();
-        String newPassword = createUserRequest.getPassword();
+        String newUsername = updateUserRequest.getUsername();
+        String newEmail = updateUserRequest.getEmail();
+        String newPassword = updateUserRequest.getPassword();
+
+        Set<String> requestedRoles = updateUserRequest.getRoles();
 
         String oldUsername = user.getUsername();
         String oldEmail = user.getEmail();
 
-        if (!oldUsername.equals(newUsername) && userRepository.existsByUsername(newUsername)) {
-            throw ResourceExistsException.username(newUsername);
+        if (newUsername != null && !newUsername.isBlank()) {
+            if (!oldUsername.equals(newUsername) && userRepository.existsByUsername(newUsername)) {
+                throw ResourceExistsException.username(newUsername);
+            }
+
+            user.setUsername(newUsername);
         }
 
-        if (!oldEmail.equals(newEmail) && userRepository.existsByEmail(newEmail)) {
-            throw ResourceExistsException.email(newEmail);
+        if (newEmail != null && !newEmail.isBlank()) {
+            if (!oldEmail.equals(newEmail) && userRepository.existsByEmail(newEmail)) {
+                throw ResourceExistsException.email(newEmail);
+            }
+            user.setEmail(newEmail);
         }
-
-        user.setUsername(newUsername);
-        user.setEmail(newEmail);
 
         if (newPassword != null && !newPassword.isBlank()) {
             user.setPassword(passwordEncoder.encode(newPassword));
         }
+
+        if (requestedRoles != null && !requestedRoles.isEmpty()) {
+            setUserRoles(requestedRoles, user);
+        }
+
         user = userRepository.save(user);
 
         return userMapper.toDto(user);

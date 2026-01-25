@@ -1,6 +1,7 @@
 package com.example.bankcards.service;
 
 import com.example.bankcards.dto.user.CreateUserRequest;
+import com.example.bankcards.dto.user.UpdateUserRequest;
 import com.example.bankcards.dto.user.UserDto;
 import com.example.bankcards.entity.RoleType;
 import jakarta.validation.constraints.NotNull;
@@ -16,7 +17,7 @@ public interface UserService {
 
     Page<UserDto> getAllUsers(Pageable pageable);
 
-    UserDto updateUser(@NotNull Long userId, @NotNull CreateUserRequest createUserRequest);
+    UserDto updateUser(@NotNull Long userId, @NotNull UpdateUserRequest updateUserRequest);
 
     void deleteUser(@NotNull Long userId);
 
