@@ -1,1 +1,784 @@
-# Здесь будет OpenAPI описание всех доступных эндпоинтов и моделей данных.
+openapi: 3.0.3
+info:
+  title: Bank Cards Management API
+  description: REST API для управления банковскими картами с JWT-аутентификацией
+  version: 1.0.0
+  contact:
+    name: API Support
+
+servers:
+  - url: http://localhost:8080
+    description: Development server
+
+tags:
+  - name: Authentication
+    description: Регистрация и авторизация
+  - name: Cards
+    description: Управление банковскими картами
+  - name: Transfers
+    description: Переводы между картами
+  - name: Users
+    description: Управление пользователями (только ADMIN)
+
+paths:
+  # ==================== AUTHENTICATION ====================
+  /api/auth/register:
+    post:
+      tags: [Authentication]
+      summary: Регистрация пользователя
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Успешная регистрация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '409':
+          description: Пользователь или email уже существует
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Пароли не совпадают
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/login:
+    post:
+      tags: [Authentication]
+      summary: Авторизация
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Успешная авторизация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Неверные учетные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ==================== CARDS ====================
+  /api/cards:
+    get:
+      tags: [Cards]
+      summary: Получить список карт пользователя
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/size'
+        - $ref: '#/components/parameters/sort'
+      responses:
+        '200':
+          description: Список карт
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageCardResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Cards]
+      summary: Создать новую карту
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCardRequest'
+      responses:
+        '201':
+          description: Карта создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Пользователь не найден
+
+  /api/cards/{id}:
+    get:
+      tags: [Cards]
+      summary: Получить карту по ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/cardId'
+      responses:
+        '200':
+          description: Данные карты
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Карта не найдена
+
+    put:
+      tags: [Cards]
+      summary: Обновить статус карты
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/cardId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CardUpdateRequest'
+      responses:
+        '200':
+          description: Карта обновлена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Карта не найдена
+        '422':
+          description: Некорректный статус
+
+    delete:
+      tags: [Cards]
+      summary: Удалить карту (только ADMIN)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/cardId'
+      responses:
+        '204':
+          description: Карта удалена
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Карта не найдена
+
+  /api/cards/{id}/block:
+    put:
+      tags: [Cards]
+      summary: Заблокировать карту
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/cardId'
+      responses:
+        '200':
+          description: Карта заблокирована
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Карта не найдена
+
+  # ==================== TRANSFERS ====================
+  /api/transfers:
+    get:
+      tags: [Transfers]
+      summary: История переводов
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/size'
+        - $ref: '#/components/parameters/sort'
+      responses:
+        '200':
+          description: Список переводов
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageTransferResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Transfers]
+      summary: Выполнить перевод
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferRequest'
+      responses:
+        '201':
+          description: Перевод выполнен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransferResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Карта не найдена
+        '422':
+          description: Бизнес-ошибка (недостаточно средств, карта заблокирована и т.д.)
+
+  # ==================== USERS ====================
+  /api/users:
+    get:
+      tags: [Users]
+      summary: Список пользователей
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/size'
+        - $ref: '#/components/parameters/sort'
+      responses:
+        '200':
+          description: Список пользователей
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageUserDto'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags: [Users]
+      summary: Создать пользователя
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: Пользователь создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDto'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Пользователь или email уже существует
+
+  /api/users/{id}:
+    get:
+      tags: [Users]
+      summary: Получить пользователя по ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/userId'
+      responses:
+        '200':
+          description: Данные пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDto'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Пользователь не найден
+
+    put:
+      tags: [Users]
+      summary: Обновить пользователя
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/userId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: Пользователь обновлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDto'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Пользователь не найден
+        '409':
+          description: Пользователь или email уже существует
+
+    delete:
+      tags: [Users]
+      summary: Удалить пользователя
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/userId'
+      responses:
+        '204':
+          description: Пользователь удален
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Пользователь не найден
+
+  /api/users/{id}/roles:
+    post:
+      tags: [Users]
+      summary: Назначить роль пользователю
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/userId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleType'
+      responses:
+        '200':
+          description: Роль назначена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDto'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Пользователь или роль не найдены
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    cardId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+      description: ID карты
+
+    userId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+      description: ID пользователя
+
+    page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 0
+      description: Номер страницы (начиная с 0)
+
+    size:
+      name: size
+      in: query
+      schema:
+        type: integer
+        default: 20
+        maximum: 100
+      description: Количество элементов на странице
+
+    sort:
+      name: sort
+      in: query
+      schema:
+        type: string
+      description: "Сортировка (например: createdAt,desc)"
+
+  responses:
+    Unauthorized:
+      description: Требуется авторизация
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Forbidden:
+      description: Доступ запрещен (требуется роль ADMIN)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    # ==================== AUTH ====================
+    RegisterRequest:
+      type: object
+      required: [username, email, password, confirmPassword]
+      properties:
+        username:
+          type: string
+          example: john_doe
+        email:
+          type: string
+          format: email
+          example: john@example.com
+        password:
+          type: string
+          format: password
+          minLength: 6
+          example: secret123
+        confirmPassword:
+          type: string
+          format: password
+          example: secret123
+
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          example: john_doe
+        password:
+          type: string
+          format: password
+          example: secret123
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        type:
+          type: string
+          default: Bearer
+        expiresIn:
+          type: string
+          format: date-time
+        user:
+          $ref: '#/components/schemas/UserDto'
+
+    # ==================== CARD ====================
+    CreateCardRequest:
+      type: object
+      required: [cardNumber, holderName, expiryDate, cvv]
+      properties:
+        cardNumber:
+          type: string
+          pattern: '^\d{4}\s?\d{4}\s?\d{4}\s?\d{4}$'
+          example: "4111 1111 1111 1111"
+        holderName:
+          type: string
+          example: IVAN IVANOV
+        expiryDate:
+          type: string
+          pattern: '^\d{2}/\d{2}$'
+          example: "12/30"
+        cvv:
+          type: string
+          pattern: '^\d{3}$'
+          example: "123"
+
+    CardUpdateRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ACTIVE, BLOCKED, EXPIRED]
+          example: BLOCKED
+
+    CardResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        maskedCardNumber:
+          type: string
+          example: "**** **** **** 1111"
+        holderName:
+          type: string
+          example: IVAN IVANOV
+        expiryDate:
+          type: string
+          example: "12/30"
+        status:
+          type: string
+          enum: [ACTIVE, BLOCKED, EXPIRED]
+          example: ACTIVE
+        balance:
+          type: number
+          format: decimal
+          example: 1000.00
+        createdAt:
+          type: string
+          format: date-time
+
+    # ==================== TRANSFER ====================
+    TransferRequest:
+      type: object
+      required: [sourceCardId, destinationCardId, amount]
+      properties:
+        sourceCardId:
+          type: integer
+          format: int64
+          example: 1
+        destinationCardId:
+          type: integer
+          format: int64
+          example: 2
+        amount:
+          type: number
+          format: decimal
+          minimum: 0.01
+          example: 100.00
+        description:
+          type: string
+          example: Перевод на карту
+
+    TransferResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        sourceCardMasked:
+          type: string
+          example: "**** **** **** 1111"
+        destinationCardMasked:
+          type: string
+          example: "**** **** **** 2222"
+        amount:
+          type: number
+          format: decimal
+          example: 100.00
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [SUCCESS, FAILED]
+          example: SUCCESS
+
+    # ==================== USER ====================
+    UserDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        username:
+          type: string
+          example: john_doe
+        email:
+          type: string
+          format: email
+          example: john@example.com
+        roles:
+          type: array
+          items:
+            type: string
+          example: [USER]
+
+    CreateUserRequest:
+      type: object
+      required: [username, email, password]
+      properties:
+        username:
+          type: string
+          example: new_user
+        email:
+          type: string
+          format: email
+          example: new@example.com
+        password:
+          type: string
+          format: password
+          minLength: 6
+          example: secret123
+        roles:
+          type: array
+          items:
+            type: string
+          example: [USER]
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          example: updated_user
+        email:
+          type: string
+          format: email
+          example: updated@example.com
+        password:
+          type: string
+          format: password
+          minLength: 6
+        roles:
+          type: array
+          items:
+            type: string
+          example: [USER, ADMIN]
+
+    RoleType:
+      type: string
+      enum: [USER, ADMIN]
+      example: ADMIN
+
+    # ==================== ERROR ====================
+    ErrorResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+          example: 400
+        error:
+          type: string
+          example: Bad Request
+        message:
+          type: string
+          example: Validation failed
+        path:
+          type: string
+          example: /api/cards
+
+    # ==================== PAGINATION ====================
+    PageCardResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/CardResponse'
+        pageable:
+          $ref: '#/components/schemas/Pageable'
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+        last:
+          type: boolean
+        first:
+          type: boolean
+        empty:
+          type: boolean
+
+    PageTransferResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransferResponse'
+        pageable:
+          $ref: '#/components/schemas/Pageable'
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+        last:
+          type: boolean
+        first:
+          type: boolean
+        empty:
+          type: boolean
+
+    PageUserDto:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserDto'
+        pageable:
+          $ref: '#/components/schemas/Pageable'
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+        last:
+          type: boolean
+        first:
+          type: boolean
+        empty:
+          type: boolean
+
+    Pageable:
+      type: object
+      properties:
+        pageNumber:
+          type: integer
+        pageSize:
+          type: integer
+        sort:
+          type: object
+          properties:
+            sorted:
+              type: boolean
+            unsorted:
+              type: boolean
+            empty:
+              type: boolean
