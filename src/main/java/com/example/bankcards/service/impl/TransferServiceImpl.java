@@ -13,6 +13,7 @@ import com.example.bankcards.repository.CardRepository;
 import com.example.bankcards.repository.TransferRepository;
 import com.example.bankcards.service.TransferService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 
+@Slf4j
 @Service
 @Transactional
 @RequiredArgsConstructor
@@ -33,6 +35,8 @@ public class TransferServiceImpl implements TransferService {
         Long sourceCardId = transferRequest.getSourceCardId();
         Long destinationCardId = transferRequest.getDestinationCardId();
         BigDecimal amount = transferRequest.getAmount();
+
+        log.debug("Transfer request: sourceCardId={}, destinationCardId={}, amount={}", sourceCardId, destinationCardId, amount);
 
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw BusinessException.invalidTransferAmount();
@@ -69,6 +73,9 @@ public class TransferServiceImpl implements TransferService {
                 .build();
 
         transfer = transferRepository.save(transfer);
+
+        log.info("Transfer completed: id={}, sourceCardId={}, destinationCardId={}, amount={}",
+                transfer.getId(), sourceCardId, destinationCardId, amount);
 
         return transferMapper.toResponse(transfer);
     }

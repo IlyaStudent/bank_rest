@@ -17,10 +17,12 @@ import com.example.bankcards.repository.UserRepository;
 import com.example.bankcards.security.JwtProvider;
 import com.example.bankcards.service.AuthService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @Transactional
 @RequiredArgsConstructor
@@ -33,6 +35,10 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public AuthResponse register(RegisterRequest registerRequest) {
+        String username = registerRequest.getUsername();
+
+        log.debug("Registration attempt: username='{}'", username);
+
         String password = registerRequest.getPassword();
         String confirmPassword = registerRequest.getConfirmPassword();
 
@@ -40,7 +46,6 @@ public class AuthServiceImpl implements AuthService {
             throw BusinessException.passwordsDoNotMatch();
         }
 
-        String username = registerRequest.getUsername();
         if (userRepository.existsByUsername(username)) {
             throw ResourceExistsException.username(username);
         }
@@ -68,6 +73,8 @@ public class AuthServiceImpl implements AuthService {
 
         UserDto userDto = userMapper.toDto(user);
 
+        log.info("User registered successfully: username='{}', id={}", username, user.getId());
+
         return AuthResponse.builder()
                 .token(token)
                 .expiresIn(jwtProvider.getTokenExpiration())
@@ -81,6 +88,8 @@ public class AuthServiceImpl implements AuthService {
         String username = loginRequest.getUsername();
         String password = loginRequest.getPassword();
 
+        log.debug("Login attempt: username='{}'", username);
+
         User user = userRepository.findByUsername(username)
                 .orElseThrow(AuthException::invalidCredentials);
 
@@ -90,6 +99,8 @@ public class AuthServiceImpl implements AuthService {
 
         String token = jwtProvider.generateToken(user);
         UserDto userDto = userMapper.toDto(user);
+
+        log.info("User logged in successfully: username='{}', id={}", username, user.getId());
 
         return AuthResponse.builder()
                 .token(token)

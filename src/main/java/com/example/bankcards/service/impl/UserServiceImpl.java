@@ -14,6 +14,7 @@ import com.example.bankcards.repository.RoleRepository;
 import com.example.bankcards.repository.UserRepository;
 import com.example.bankcards.service.UserService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -23,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @Transactional
 @RequiredArgsConstructor
@@ -37,6 +39,8 @@ public class UserServiceImpl implements UserService {
         String username = createUserRequest.getUsername();
         String email = createUserRequest.getEmail();
         String password = createUserRequest.getPassword();
+
+        log.debug("Creating user: username='{}'", username);
 
         if (userRepository.existsByUsername(username)) {
             throw ResourceExistsException.username(username);
@@ -54,6 +58,9 @@ public class UserServiceImpl implements UserService {
         setUserRoles(requestedRoles, user);
 
         user = userRepository.save(user);
+
+        log.info("User created: id={}, username='{}'", user.getId(), username);
+
         return userMapper.toDto(user);
     }
 
@@ -85,6 +92,8 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserDto updateUser(Long userId, UpdateUserRequest updateUserRequest) {
+        log.debug("Updating user id={}", userId);
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> ResourceNotFoundException.user(userId));
 
@@ -101,7 +110,6 @@ public class UserServiceImpl implements UserService {
             if (!oldUsername.equals(newUsername) && userRepository.existsByUsername(newUsername)) {
                 throw ResourceExistsException.username(newUsername);
             }
-
             user.setUsername(newUsername);
         }
 
@@ -122,19 +130,27 @@ public class UserServiceImpl implements UserService {
 
         user = userRepository.save(user);
 
+        log.info("User updated: id={}", userId);
+
         return userMapper.toDto(user);
     }
 
     @Override
     public void deleteUser(Long userId) {
+        log.debug("Deleting user id={}", userId);
+
         if (!userRepository.existsById(userId)) {
             throw ResourceNotFoundException.user(userId);
         }
         userRepository.deleteById(userId);
+
+        log.info("User deleted: id={}", userId);
     }
 
     @Override
     public UserDto assignRole(Long userId, RoleType roleType) {
+        log.debug("Assigning role: userId={}, role={}", userId, roleType);
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> ResourceNotFoundException.user(userId));
         Role role = roleRepository.findByName(roleType)
@@ -143,6 +159,8 @@ public class UserServiceImpl implements UserService {
         user.getRoles().add(role);
 
         user = userRepository.save(user);
+
+        log.info("Role assigned: userId={}, role={}", userId, roleType);
 
         return userMapper.toDto(user);
     }
@@ -162,7 +180,6 @@ public class UserServiceImpl implements UserService {
                         } catch (IllegalArgumentException e) {
                             throw BusinessException.invalidRole(roleName);
                         }
-
                         return roleRepository.findByName(roleType)
                                 .orElseThrow(() -> ResourceNotFoundException.role(roleType));
                     })

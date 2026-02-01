@@ -1,7 +1,6 @@
 package com.example.bankcards.exception;
 
 import com.example.bankcards.dto.error.ErrorResponse;
-import com.example.bankcards.util.constants.ApiConstants;
 import com.example.bankcards.util.constants.ApiErrorMessage;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -13,10 +12,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 
 @Slf4j
 @RestControllerAdvice
@@ -27,7 +24,7 @@ public class GlobalExceptionHandler {
             ResourceNotFoundException ex,
             HttpServletRequest request
     ) {
-        logError(ex);
+        log.warn("Resource not found: {} - {}", request.getRequestURI(), ex.getMessage());
         return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage(), request);
     }
 
@@ -36,7 +33,7 @@ public class GlobalExceptionHandler {
             ResourceExistsException ex,
             HttpServletRequest request
     ) {
-        logError(ex);
+        log.warn("Resource already exists: {} - {}", request.getRequestURI(), ex.getMessage());
         return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request);
     }
 
@@ -45,7 +42,7 @@ public class GlobalExceptionHandler {
             BusinessException ex,
             HttpServletRequest request
     ) {
-        logError(ex);
+        log.warn("Business error: {} - {}", request.getRequestURI(), ex.getMessage());
         return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), request);
     }
 
@@ -54,7 +51,7 @@ public class GlobalExceptionHandler {
             AuthException ex,
             HttpServletRequest request
     ) {
-        logError(ex);
+        log.warn("Authentication error: {} - {}", request.getRequestURI(), ex.getMessage());
         return buildResponse(HttpStatus.UNAUTHORIZED, ex.getMessage(), request);
     }
 
@@ -63,7 +60,7 @@ public class GlobalExceptionHandler {
             EncryptionException ex,
             HttpServletRequest request
     ) {
-        logError(ex);
+        log.error("Encryption error: {} - {}", request.getRequestURI(), ex.getMessage(), ex);
         return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage(), request);
     }
 
@@ -72,13 +69,12 @@ public class GlobalExceptionHandler {
             MethodArgumentNotValidException ex,
             HttpServletRequest request
     ) {
-        logError(ex);
-
         Map<String, String> errors = new HashMap<>();
         for (FieldError error : ex.getBindingResult().getFieldErrors()) {
             errors.put(error.getField(), error.getDefaultMessage());
         }
 
+        log.warn("Validation error: {} - {}", request.getRequestURI(), errors);
         return buildResponse(HttpStatus.BAD_REQUEST, errors.toString(), request);
     }
 
@@ -87,7 +83,7 @@ public class GlobalExceptionHandler {
             Exception ex,
             HttpServletRequest request
     ) {
-        logError(ex);
+        log.error("Unexpected error: {} - {}", request.getRequestURI(), ex.getMessage(), ex);
         return buildResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 ApiErrorMessage.UNEXPECTED_ERROR.getMessage(),
@@ -108,28 +104,5 @@ public class GlobalExceptionHandler {
                 request.getRequestURI()
         );
         return ResponseEntity.status(status).body(errorResponse);
-    }
-
-    private void logError(Exception ex) {
-        StringBuilder stackTrace = new StringBuilder();
-        stackTrace.append(ApiConstants.ANSI_RED);
-        stackTrace.append(ex.getMessage()).append(ApiConstants.BREAK_LINE);
-
-        if (Objects.nonNull(ex.getCause())) {
-            stackTrace.append(ex.getCause().getMessage()).append(ApiConstants.BREAK_LINE);
-        }
-
-        Arrays.stream(ex.getStackTrace())
-                .filter(st -> st.getClassName().startsWith(ApiConstants.BASE_PACKAGE))
-                .forEach(st -> stackTrace
-                        .append(st.getClassName())
-                        .append(".")
-                        .append(st.getMethodName())
-                        .append(" (")
-                        .append(st.getLineNumber())
-                        .append(") ")
-                );
-
-        log.error(stackTrace.append(ApiConstants.ANSI_WHITE).toString());
     }
 }

@@ -65,13 +65,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                 authorities
                         );
                         SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+
+                        log.debug("User authenticated: email='{}', uri={}", email, requestURI);
                     }
                 });
 
             } catch (ExpiredJwtException e) {
+                log.warn("JWT token expired: uri={}", requestURI);
                 handleTokenExpiration(requestURI, jwt, response);
                 return;
             } catch (SignatureException | MalformedJwtException e) {
+                log.warn("Invalid JWT signature: uri={}", requestURI);
                 handleSignatureException(response);
                 return;
             } catch (Exception e) {
