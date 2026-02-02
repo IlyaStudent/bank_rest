@@ -2,16 +2,39 @@
 
 REST API для управления банковскими картами с JWT-аутентификацией, ролевой моделью доступа и шифрованием данных.
 
+## Конфигурация
+
+Перед запуском создайте файл `.env` на основе шаблона:
+
+```bash
+cp .env.example .env
+```
+
+Генерация ключей:
+```bash
+# ENCRYPTION_KEY
+openssl rand -base64 32
+
+# JWT_SECRET
+openssl rand -base64 32
+```
+
+> **Важно:** Приложение не запустится без `ENCRYPTION_KEY` и `JWT_SECRET` (fail fast).
+
 ## Запуск
 
 ```bash
-# 1. Запуск PostgreSQL
+# 1. Настройка окружения
+cp .env.example .env
+# Отредактируйте .env, добавив ENCRYPTION_KEY и JWT_SECRET
+
+# 2. Запуск PostgreSQL
 docker-compose up -d
 
-# 2. Сборка и запуск
+# 3. Сборка и запуск
 ./mvnw spring-boot:run
 
-# 3. Swagger UI
+# 4. Swagger UI
 open http://localhost:8080/swagger-ui.html
 ```
 

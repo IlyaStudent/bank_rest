@@ -3,9 +3,9 @@ spring:
     name: bank_rest
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/bank_rest
-    username: postgres
-    password: postgres
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/bank_rest}
+    username: ${DATABASE_USER:postgres}
+    password: ${DATABASE_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -33,10 +33,10 @@ server:
 
 app:
   encryption:
-    key: mAwbivjC09yqaqa8g+xvYu737OXw8W9ppmoUjTyY41Y=
+    key: ${ENCRYPTION_KEY}
   jwt:
-    secret: 89b49V/UHLCm2kMURdM8pCe0zmHfc5Tf/L6cMoJsnF0=
-    expiration: 3600000
+    secret: ${JWT_SECRET}
+    expiration: ${JWT_EXPIRATION:3600000}
 
 springdoc:
   swagger-ui:
