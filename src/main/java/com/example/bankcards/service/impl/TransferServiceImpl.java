@@ -6,12 +6,15 @@ import com.example.bankcards.entity.Card;
 import com.example.bankcards.entity.CardStatus;
 import com.example.bankcards.entity.Transfer;
 import com.example.bankcards.entity.TransferStatus;
+import com.example.bankcards.event.TransferEvent;
 import com.example.bankcards.exception.BusinessException;
 import com.example.bankcards.exception.ResourceNotFoundException;
 import com.example.bankcards.mapper.TransferMapper;
 import com.example.bankcards.repository.CardRepository;
 import com.example.bankcards.repository.TransferRepository;
+import com.example.bankcards.service.KafkaProducerService;
 import com.example.bankcards.service.TransferService;
+import com.example.bankcards.util.CardMaskingUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -29,6 +32,7 @@ public class TransferServiceImpl implements TransferService {
     private final TransferRepository transferRepository;
     private final CardRepository cardRepository;
     private final TransferMapper transferMapper;
+    private final KafkaProducerService kafkaProducerService;
 
     @Override
     public TransferResponse transferMoney(TransferRequest transferRequest) {
@@ -74,6 +78,8 @@ public class TransferServiceImpl implements TransferService {
 
         transfer = transferRepository.save(transfer);
 
+        publishTransferEvent(transfer, sourceCard, destinationCard);
+
         log.info("Transfer completed: id={}, sourceCardId={}, destinationCardId={}, amount={}",
                 transfer.getId(), sourceCardId, destinationCardId, amount);
 
@@ -96,5 +102,20 @@ public class TransferServiceImpl implements TransferService {
         if (card.getStatus() == CardStatus.EXPIRED) {
             throw BusinessException.cardExpired(card.getId());
         }
+    }
+
+    private void publishTransferEvent(Transfer transfer, Card sourceCard, Card destinationCard) {
+        TransferEvent event = new TransferEvent(
+                transfer.getId(),
+                sourceCard.getOwner().getId(),
+                destinationCard.getOwner().getId(),
+                CardMaskingUtil.maskCardNumber(sourceCard.getCardNumber()),
+                CardMaskingUtil.maskCardNumber(destinationCard.getCardNumber()),
+                transfer.getAmount(),
+                transfer.getTimestamp(),
+                transfer.getStatus().name()
+        );
+
+        kafkaProducerService.sendTransferEvent(event);
     }
 }
