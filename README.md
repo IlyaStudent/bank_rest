@@ -1,6 +1,12 @@
 # Bank Cards Management API
 
-REST API для управления банковскими картами с JWT-аутентификацией, ролевой моделью доступа и шифрованием данных.
+REST API для управления банковскими картами с JWT-аутентификацией, ролевой моделью доступа, шифрованием данных и интеграцией с Apache Kafka.
+
+## Архитектура системы
+
+**Bank API** — основной сервис для управления картами и переводами. При успешном переводе публикует событие в Kafka.
+
+**Notification Service** — микросервис-consumer, получает события о переводах и логирует уведомления для отправителя и получателя.
 
 ## Конфигурация
 
@@ -23,43 +29,66 @@ openssl rand -base64 32
 
 ## Запуск
 
+### 1. Запуск инфраструктуры (PostgreSQL + Kafka)
+
 ```bash
-# 1. Настройка окружения
-cp .env.example .env
-# Отредактируйте .env, добавив ENCRYPTION_KEY и JWT_SECRET
-
-# 2. Запуск PostgreSQL
 docker-compose up -d
-
-# 3. Сборка и запуск
-./mvnw spring-boot:run
-
-# 4. Swagger UI
-open http://localhost:8080/swagger-ui.html
 ```
+
+### 2. Запуск Bank API
+
+```bash
+./mvnw spring-boot:run
+```
+
+Swagger UI: http://localhost:8080/swagger-ui.html
+
+### 3. Запуск Notification Service (опционально)
+
+```bash
+cd ../bank_notification_service
+./mvnw spring-boot:run
+```
+
+Сервис будет слушать события на порту 8081.
 
 **Тестовый админ:** `admin` / `admin123`
 
 ## Технологии
 
-- **Java 21** / **Spring Boot 3**
-- **Spring Security** + **JWT**
-- **Spring Data JPA** + **PostgreSQL**
-- **Liquibase** (миграции БД)
-- **AES-256** (шифрование карт)
-- **Swagger/OpenAPI**
-- **JUnit 5** + **Mockito**
-- **Docker Compose**
+| Компонент | Технологии |
+|-----------|-----------|
+| **Backend** | Java 21, Spring Boot 3.2 |
+| **Security** | Spring Security, JWT, AES-256 |
+| **Database** | PostgreSQL, Spring Data JPA, Liquibase |
+| **Messaging** | Apache Kafka, Spring Kafka |
+| **Docs** | Swagger/OpenAPI |
+| **Testing** | JUnit 5, Mockito |
+| **Infrastructure** | Docker Compose |
 
-## Архитектура
+## Структура проекта
 
-Слоистая архитектура с разделением ответственности:
-
-- **Controller** — обработка HTTP-запросов, валидация входных данных
-- **Service** — бизнес-логика, транзакции
-- **Repository** — доступ к данным (Spring Data JPA)
-- **DTO** — объекты для API (отделены от Entity)
-- **Entity** — JPA-сущности
+```
+bank_rest/
+├── src/main/java/com/example/bankcards/
+│   ├── controller/      # REST endpoints
+│   ├── service/         # Бизнес-логика
+│   ├── repository/      # Доступ к данным
+│   ├── entity/          # JPA-сущности
+│   ├── dto/             # Data Transfer Objects
+│   ├── event/           # Kafka events (TransferEvent)
+│   ├── security/        # JWT, фильтры
+│   ├── config/          # Конфигурации
+│   ├── mapper/          # Entity <-> DTO
+│   ├── exception/       # Обработка ошибок
+│   ├── util/            # Утилиты (шифрование, маскирование)
+│   └── validation/      # Custom validators
+├── src/main/resources/
+│   ├── application.yml
+│   └── db/migration/    # Liquibase миграции
+├── docker-compose.yml   # PostgreSQL + Kafka + Zookeeper
+└── pom.xml
+```
 
 ## Возможности
 
@@ -70,25 +99,78 @@ open http://localhost:8080/swagger-ui.html
 
 **Безопасность:**
 - JWT-токены с настраиваемым сроком действия
-- Шифрование номеров карт (AES-256)
+- Шифрование номеров карт (AES-256-GCM)
 - Маскирование при отображении (`**** **** **** 1234`)
 - Ролевая модель доступа (RBAC)
 
+**Kafka интеграция:**
+- При успешном переводе публикуется `TransferEvent` в топик `bank.transfers`
+- Notification Service получает события и логирует уведомления
+
 ## API Endpoints
 
+### Аутентификация
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| POST | `/api/auth/register` | Регистрация пользователя |
+| POST | `/api/auth/login` | Авторизация, получение JWT |
+
+### Карты
 | Метод | Endpoint | Описание | Роль |
 |-------|----------|----------|------|
-| POST | `/api/auth/register` | Регистрация | — |
-| POST | `/api/auth/login` | Авторизация | — |
-| GET | `/api/cards` | Список карт | USER |
+| GET | `/api/cards` | Список карт пользователя | USER |
+| GET | `/api/cards/{id}` | Информация о карте | USER |
 | POST | `/api/cards` | Создание карты | ADMIN |
-| POST | `/api/transfers` | Перевод | USER |
+| PUT | `/api/cards/{id}` | Обновление карты | ADMIN |
+| DELETE | `/api/cards/{id}` | Удаление карты | ADMIN |
+| PUT | `/api/cards/{id}/block` | Блокировка карты | USER |
+
+### Переводы
+| Метод | Endpoint | Описание | Роль |
+|-------|----------|----------|------|
+| POST | `/api/transfers` | Выполнить перевод | USER |
+| GET | `/api/transfers` | История переводов | USER |
+
+### Пользователи (Admin)
+| Метод | Endpoint | Описание | Роль |
+|-------|----------|----------|------|
 | GET | `/api/users` | Список пользователей | ADMIN |
+| GET | `/api/users/{id}` | Информация о пользователе | ADMIN |
+| POST | `/api/users` | Создание пользователя | ADMIN |
+| PUT | `/api/users/{id}` | Обновление пользователя | ADMIN |
+| DELETE | `/api/users/{id}` | Удаление пользователя | ADMIN |
+| POST | `/api/users/{id}/roles` | Назначение роли | ADMIN |
 
 ## Тестирование
 
 ```bash
+# Все тесты
 ./mvnw test
+
+# Конкретный тест
+./mvnw test -Dtest=TransferServiceImplTest
 ```
 
-Unit-тесты покрывают сервисный слой: `AuthService`, `CardService`, `TransferService`, `UserService`.
+Unit-тесты покрывают сервисный слой: `AuthService`, `CardService`, `TransferService`, `UserService`, `KafkaProducerService`.
+
+## Kafka команды
+
+```bash
+# Список топиков
+docker exec bank_rest_kafka kafka-topics --list --bootstrap-server localhost:9092
+
+# Просмотр сообщений в топике
+docker exec bank_rest_kafka kafka-console-consumer \
+  --bootstrap-server localhost:9092 \
+  --topic bank.transfers \
+  --from-beginning
+
+# Информация о consumer group
+docker exec bank_rest_kafka kafka-consumer-groups \
+  --bootstrap-server localhost:9092 \
+  --describe --group bank_notification_service
+```
+
+## Связанные проекты
+
+- [bank_notification_service](https://github.com/IlyaStudent/bank_notification_service) — Kafka consumer для уведомлений о переводах
