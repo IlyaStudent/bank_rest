@@ -36,7 +36,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-public class CardServiceImplTest {
+class CardServiceImplTest {
 
     @Mock
     private CardRepository cardRepository;
@@ -168,13 +168,18 @@ public class CardServiceImplTest {
         @Test
         @DisplayName("Should throw exception when expiry date format invalid")
         void shouldThrowExceptionWhenExpiryDateFormatInvalid() {
-            createCardRequest.setExpiryDate("invalid-date");
+            CreateCardRequest invalidRequest = CreateCardRequest.builder()
+                    .cardNumber(cardNumber)
+                    .holderName(holderName)
+                    .expiryDate("invalid-date")
+                    .cvv("777")
+                    .build();
 
             when(userRepository.findById(userId)).thenReturn(Optional.of(owner));
             when(encryptionUtil.encrypt(cardNumber)).thenReturn(encryptedCardNumber);
 
-            assertThatThrownBy(() -> cardService.createCard(createCardRequest, userId))
-                    .isInstanceOf(Exception.class);
+            assertThatThrownBy(() -> cardService.createCard(invalidRequest, userId))
+                    .isInstanceOf(BusinessException.class);
 
             verify(cardRepository, never()).save(any(Card.class));
         }

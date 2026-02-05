@@ -35,7 +35,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-public class TransferServiceImplTest {
+class TransferServiceImplTest {
 
     @Mock
     private TransferRepository transferRepository;
@@ -230,9 +230,16 @@ public class TransferServiceImplTest {
         @Test
         @DisplayName("Should throw exception when source card blocked")
         void shouldThrowExceptionWhenSourceCardBlocked() {
-            sourceCard.setStatus(CardStatus.BLOCKED);
+            Card blockedSourceCard = Card.builder()
+                    .id(sourceCardId)
+                    .cardNumber("1111 2222 3333 4444")
+                    .holderName("IVAN IVANOV")
+                    .expiryDate(LocalDate.of(2030, 12, 31))
+                    .status(CardStatus.BLOCKED)
+                    .balance(sourceCardBalance)
+                    .build();
 
-            when(cardRepository.findById(sourceCardId)).thenReturn(Optional.of(sourceCard));
+            when(cardRepository.findById(sourceCardId)).thenReturn(Optional.of(blockedSourceCard));
             when(cardRepository.findById(destinationCardId)).thenReturn(Optional.of(destinationCard));
 
             assertThatThrownBy(() -> transferService.transferMoney(transferRequest))
@@ -245,9 +252,16 @@ public class TransferServiceImplTest {
         @Test
         @DisplayName("Should throw exception when source card expired")
         void shouldThrowExceptionWhenSourceCardExpired() {
-            sourceCard.setStatus(CardStatus.EXPIRED);
+            Card expiredSourceCard = Card.builder()
+                    .id(sourceCardId)
+                    .cardNumber("1111 2222 3333 4444")
+                    .holderName("IVAN IVANOV")
+                    .expiryDate(LocalDate.of(2030, 12, 31))
+                    .status(CardStatus.EXPIRED)
+                    .balance(sourceCardBalance)
+                    .build();
 
-            when(cardRepository.findById(sourceCardId)).thenReturn(Optional.of(sourceCard));
+            when(cardRepository.findById(sourceCardId)).thenReturn(Optional.of(expiredSourceCard));
             when(cardRepository.findById(destinationCardId)).thenReturn(Optional.of(destinationCard));
 
             assertThatThrownBy(() -> transferService.transferMoney(transferRequest))
@@ -275,10 +289,17 @@ public class TransferServiceImplTest {
         @Test
         @DisplayName("Should throw exception when destination card blocked")
         void shouldThrowExceptionWhenDestinationCardBlocked() {
-            destinationCard.setStatus(CardStatus.BLOCKED);
+            Card blockedDestinationCard = Card.builder()
+                    .id(destinationCardId)
+                    .cardNumber("5555 6666 7777 8888")
+                    .holderName("PETR PETROV")
+                    .expiryDate(LocalDate.of(2030, 12, 31))
+                    .status(CardStatus.BLOCKED)
+                    .balance(destinationCardBalance)
+                    .build();
 
             when(cardRepository.findById(sourceCardId)).thenReturn(Optional.of(sourceCard));
-            when(cardRepository.findById(destinationCardId)).thenReturn(Optional.of(destinationCard));
+            when(cardRepository.findById(destinationCardId)).thenReturn(Optional.of(blockedDestinationCard));
 
             assertThatThrownBy(() -> transferService.transferMoney(transferRequest))
                     .isInstanceOf(BusinessException.class);
@@ -290,10 +311,17 @@ public class TransferServiceImplTest {
         @Test
         @DisplayName("Should throw exception when destination card expired")
         void shouldThrowExceptionWhenDestinationCardExpired() {
-            destinationCard.setStatus(CardStatus.EXPIRED);
+            Card expiredDestinationCard = Card.builder()
+                    .id(destinationCardId)
+                    .cardNumber("5555 6666 7777 8888")
+                    .holderName("PETR PETROV")
+                    .expiryDate(LocalDate.of(2030, 12, 31))
+                    .status(CardStatus.EXPIRED)
+                    .balance(destinationCardBalance)
+                    .build();
 
             when(cardRepository.findById(sourceCardId)).thenReturn(Optional.of(sourceCard));
-            when(cardRepository.findById(destinationCardId)).thenReturn(Optional.of(destinationCard));
+            when(cardRepository.findById(destinationCardId)).thenReturn(Optional.of(expiredDestinationCard));
 
             assertThatThrownBy(() -> transferService.transferMoney(transferRequest))
                     .isInstanceOf(BusinessException.class);

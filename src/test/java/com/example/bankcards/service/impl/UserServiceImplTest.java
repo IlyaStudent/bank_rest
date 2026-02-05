@@ -38,7 +38,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-public class UserServiceImplTest {
+class UserServiceImplTest {
 
     @Mock
     private UserRepository userRepository;
@@ -111,7 +111,15 @@ public class UserServiceImplTest {
                 .roles(new HashSet<>(Set.of(roleType.name())))
                 .build();
 
-        userList = List.of(user, user);
+        User user2 = User.builder()
+                .id(2L)
+                .username("test2")
+                .email("test2@example.com")
+                .password(password)
+                .roles(new HashSet<>(Set.of(role)))
+                .build();
+
+        userList = List.of(user, user2);
 
         userPage = new PageImpl<>(userList, pageable, userList.size());
     }
@@ -151,18 +159,30 @@ public class UserServiceImplTest {
         @DisplayName("Should create user successfully with specified roles")
         void shouldCreateUserSuccessfullyWithSpecifiedRoles() {
             Role adminRole = new Role(2L, RoleType.ADMIN);
-            createUserRequest.setRoles(Set.of(RoleType.ADMIN.name()));
-            userDto.setRoles(Set.of(RoleType.ADMIN.name()));
+
+            CreateUserRequest adminRequest = CreateUserRequest.builder()
+                    .username(username)
+                    .email(email)
+                    .password(password)
+                    .roles(Set.of(RoleType.ADMIN.name()))
+                    .build();
+
+            UserDto adminUserDto = UserDto.builder()
+                    .id(userId)
+                    .username(username)
+                    .email(email)
+                    .roles(Set.of(RoleType.ADMIN.name()))
+                    .build();
 
             when(userRepository.existsByUsername(username)).thenReturn(false);
             when(userRepository.existsByEmail(email)).thenReturn(false);
-            when(userMapper.createUser(createUserRequest)).thenReturn(user);
+            when(userMapper.createUser(adminRequest)).thenReturn(user);
             when(passwordEncoder.encode(password)).thenReturn(encodedPassword);
             when(roleRepository.findByName(RoleType.ADMIN)).thenReturn(Optional.of(adminRole));
             when(userRepository.save(user)).thenReturn(user);
-            when(userMapper.toDto(user)).thenReturn(userDto);
+            when(userMapper.toDto(user)).thenReturn(adminUserDto);
 
-            UserDto result = userService.createUser(createUserRequest);
+            UserDto result = userService.createUser(adminRequest);
 
             assertThat(result).isNotNull();
             assertThat(result.getRoles()).contains(RoleType.ADMIN.name());

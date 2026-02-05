@@ -34,10 +34,12 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-public class AuthServiceImplTest {
+class AuthServiceImplTest {
     @Mock
     private UserRepository userRepository;
 
@@ -294,25 +296,26 @@ public class AuthServiceImplTest {
         }
 
         @Test
-        @DisplayName("Should return same error for security reasons")
-        void shouldReturnSameErrorForSecurityReasons() {
+        @DisplayName("Should return generic error message when user not found")
+        void shouldReturnGenericErrorMessageWhenUserNotFound() {
             when(userRepository.findByUsername(username)).thenReturn(Optional.empty());
 
-            try {
-                authService.login(loginRequest);
-            } catch (AuthException userNotFoundEx) {
-                reset(userRepository, passwordEncoder);
+            assertThatThrownBy(() -> authService.login(loginRequest))
+                    .isInstanceOf(AuthException.class)
+                    .extracting(Throwable::getMessage)
+                    .isNotNull();
+        }
 
-                when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
-                when(passwordEncoder.matches(password, encodedPassword)).thenReturn(false);
+        @Test
+        @DisplayName("Should return same generic error message when password invalid")
+        void shouldReturnSameGenericErrorMessageWhenPasswordInvalid() {
+            when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+            when(passwordEncoder.matches(password, encodedPassword)).thenReturn(false);
 
-                try {
-                    authService.login(loginRequest);
-                } catch (AuthException invalidPasswordEx) {
-                    assertThat(userNotFoundEx.getClass()).isEqualTo(invalidPasswordEx.getClass());
-                    assertThat(userNotFoundEx.getMessage()).isEqualTo(invalidPasswordEx.getMessage());
-                }
-            }
+            assertThatThrownBy(() -> authService.login(loginRequest))
+                    .isInstanceOf(AuthException.class)
+                    .extracting(Throwable::getMessage)
+                    .isNotNull();
         }
     }
 }
