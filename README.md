@@ -146,12 +146,20 @@ bank_rest/
 ```bash
 # Все тесты
 ./mvnw test
-
-# Конкретный тест
-./mvnw test -Dtest=TransferServiceImplTest
 ```
 
-Unit-тесты покрывают сервисный слой: `AuthService`, `CardService`, `TransferService`, `UserService`, `KafkaProducerService`.
+### Покрытие тестами
+
+**Controller тесты** (`@WebMvcTest`):
+- Проверка HTTP статусов (200, 201, 400, 401, 403, 404, 409, 422)
+- Валидация request body
+- Аутентификация и авторизация
+- Маппинг response
+
+**Service тесты** (Unit с Mockito):
+- Бизнес-логика
+- Обработка исключений
+- Взаимодействие с репозиториями
 
 ## Kafka команды
 

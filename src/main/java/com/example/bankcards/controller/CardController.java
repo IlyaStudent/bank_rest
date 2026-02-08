@@ -63,7 +63,7 @@ public class CardController {
             @ApiResponse(responseCode = "401", description = "Unauthorized")
     })
     @GetMapping("${end.point.id}")
-    public CardResponse getCardInfo(
+    public CardResponse getCardById(
             @Parameter(description = "Card ID") @PathVariable(name = "id") Long cardId
     ) {
         return cardService.getCardById(cardId);
