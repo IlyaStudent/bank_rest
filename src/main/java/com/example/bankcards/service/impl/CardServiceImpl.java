@@ -29,6 +29,8 @@ import java.time.format.DateTimeFormatter;
 @Transactional
 @RequiredArgsConstructor
 public class CardServiceImpl implements CardService {
+    private static final DateTimeFormatter EXPIRY_DATE_FORMATTER = DateTimeFormatter.ofPattern("MM/yy");
+
     private final CardRepository cardRepository;
     private final UserRepository userRepository;
     private final CardMapper cardMapper;
@@ -38,22 +40,8 @@ public class CardServiceImpl implements CardService {
     public CardResponse createCard(CreateCardRequest createCardRequest, Long userId) {
         log.debug("Creating card for user id={}", userId);
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> ResourceNotFoundException.user(userId));
-
-        String encryptedCardNumber = encryptionUtil.encrypt(createCardRequest.getCardNumber());
-
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM/yy");
-        YearMonth yearMonth = YearMonth.parse(createCardRequest.getExpiryDate(), formatter);
-        LocalDate expiryDate = yearMonth.atEndOfMonth();
-
-        Card card = Card.builder()
-                .cardNumber(encryptedCardNumber)
-                .owner(user)
-                .holderName(createCardRequest.getHolderName())
-                .expiryDate(expiryDate)
-                .build();
-
+        User user = findUserById(userId);
+        Card card = buildCard(createCardRequest, user);
         card = cardRepository.save(card);
 
         log.info("Card created: id={}, userId={}, holder='{}'", card.getId(), userId, card.getHolderName());
@@ -64,10 +52,7 @@ public class CardServiceImpl implements CardService {
     @Override
     @Transactional(readOnly = true)
     public CardResponse getCardById(Long cardId) {
-        Card card = cardRepository.findById(cardId)
-                .orElseThrow(() -> ResourceNotFoundException.card(cardId));
-
-        return cardMapper.toResponse(card);
+        return cardMapper.toResponse(findCardById(cardId));
     }
 
     @Override
@@ -84,22 +69,16 @@ public class CardServiceImpl implements CardService {
 
     @Override
     public CardResponse updateCard(Long cardId, CardUpdateRequest cardUpdateRequest) {
-        Card card = cardRepository.findById(cardId)
-                .orElseThrow(() -> ResourceNotFoundException.card(cardId));
-
-        updateCardStatus(card, cardUpdateRequest.getStatus());
-
-        return cardMapper.toResponse(card);
+        Card card = findCardById(cardId);
+        return changeCardStatus(card, cardUpdateRequest.getStatus());
     }
 
     @Override
     public CardResponse blockCard(Long cardId) {
         log.debug("Blocking card id={}", cardId);
 
-        Card card = cardRepository.findById(cardId)
-                .orElseThrow(() -> ResourceNotFoundException.card(cardId));
-
-        CardResponse response = updateCardStatus(card, CardStatus.BLOCKED.name());
+        Card card = findCardById(cardId);
+        CardResponse response = changeCardStatus(card, CardStatus.BLOCKED.name());
 
         log.info("Card blocked: id={}", cardId);
 
@@ -118,20 +97,52 @@ public class CardServiceImpl implements CardService {
         log.info("Card deleted: id={}", cardId);
     }
 
-    private CardResponse updateCardStatus(Card card, String requestedCardStatus) {
-        CardStatus cardStatus;
-        try {
-            cardStatus = CardStatus.valueOf(requestedCardStatus);
-        } catch (IllegalArgumentException e) {
-            throw BusinessException.invalidCardStatus(requestedCardStatus);
-        }
+    // --- Lookup --- //
 
+    private Card findCardById(Long cardId) {
+        return cardRepository.findById(cardId)
+                .orElseThrow(() -> ResourceNotFoundException.card(cardId));
+    }
+
+    private User findUserById(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> ResourceNotFoundException.user(userId));
+    }
+
+    // --- Card building --- //
+
+    private Card buildCard(CreateCardRequest request, User owner) {
+        return Card.builder()
+                .cardNumber(encryptionUtil.encrypt(request.getCardNumber()))
+                .owner(owner)
+                .holderName(request.getHolderName())
+                .expiryDate(parseExpiryDate(request.getExpiryDate()))
+                .build();
+    }
+
+    private LocalDate parseExpiryDate(String expiryDate) {
+        return YearMonth.parse(expiryDate, EXPIRY_DATE_FORMATTER).atEndOfMonth();
+    }
+
+    // --- Status management --- //
+
+    private CardResponse changeCardStatus(Card card, String requestedStatus) {
+        CardStatus newStatus = parseCardStatus(requestedStatus);
         CardStatus previousStatus = card.getStatus();
-        card.setStatus(cardStatus);
+
+        card.setStatus(newStatus);
         card = cardRepository.save(card);
 
-        log.debug("Card status updated: id={}, previousStatus={}, newStatus={}", card.getId(), previousStatus, cardStatus);
+        log.debug("Card status updated: id={}, {} -> {}", card.getId(), previousStatus, newStatus);
 
         return cardMapper.toResponse(card);
+    }
+
+    private CardStatus parseCardStatus(String status) {
+        try {
+            return CardStatus.valueOf(status);
+        } catch (IllegalArgumentException e) {
+            throw BusinessException.invalidCardStatus(status);
+        }
     }
 }

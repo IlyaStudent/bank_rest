@@ -36,52 +36,25 @@ public class TransferServiceImpl implements TransferService {
 
     @Override
     public TransferResponse transferMoney(TransferRequest transferRequest) {
-        Long sourceCardId = transferRequest.getSourceCardId();
-        Long destinationCardId = transferRequest.getDestinationCardId();
-        BigDecimal amount = transferRequest.getAmount();
+        log.debug("Transfer request: sourceCardId={}, destinationCardId={}, amount={}",
+                transferRequest.getSourceCardId(), transferRequest.getDestinationCardId(), transferRequest.getAmount());
 
-        log.debug("Transfer request: sourceCardId={}, destinationCardId={}, amount={}", sourceCardId, destinationCardId, amount);
+        validateTransferRequest(transferRequest);
 
-        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw BusinessException.invalidTransferAmount();
-        }
+        Card sourceCard = findCardById(transferRequest.getSourceCardId());
+        Card destinationCard = findCardById(transferRequest.getDestinationCardId());
 
-        if (sourceCardId.equals(destinationCardId)) {
-            throw BusinessException.sameCardTransfer();
-        }
+        validateCardForTransfer(sourceCard);
+        validateCardForTransfer(destinationCard);
+        validateSufficientFunds(sourceCard, transferRequest.getAmount());
 
-        Card sourceCard = cardRepository.findById(sourceCardId)
-                .orElseThrow(() -> ResourceNotFoundException.card(sourceCardId));
-        Card destinationCard = cardRepository.findById(destinationCardId)
-                .orElseThrow(() -> ResourceNotFoundException.card(destinationCardId));
+        executeBalanceTransfer(sourceCard, destinationCard, transferRequest.getAmount());
 
-        validateCardStatus(sourceCard);
-        validateCardStatus(destinationCard);
-
-        BigDecimal sourceCardBalance = sourceCard.getBalance();
-        BigDecimal destinationCardBalance = destinationCard.getBalance();
-
-        if (sourceCardBalance.compareTo(amount) < 0) {
-            throw BusinessException.insufficientFunds(amount, sourceCardBalance);
-        }
-
-        sourceCard.setBalance(sourceCard.getBalance().subtract(amount));
-        destinationCard.setBalance(destinationCardBalance.add(amount));
-
-        Transfer transfer = Transfer.builder()
-                .sourceCard(sourceCard)
-                .destinationCard(destinationCard)
-                .amount(amount)
-                .description(transferRequest.getDescription())
-                .status(TransferStatus.SUCCESS)
-                .build();
-
-        transfer = transferRepository.save(transfer);
-
+        Transfer transfer = createTransfer(transferRequest, sourceCard, destinationCard);
         publishTransferEvent(transfer, sourceCard, destinationCard);
 
         log.info("Transfer completed: id={}, sourceCardId={}, destinationCardId={}, amount={}",
-                transfer.getId(), sourceCardId, destinationCardId, amount);
+                transfer.getId(), sourceCard.getId(), destinationCard.getId(), transferRequest.getAmount());
 
         return transferMapper.toResponse(transfer);
     }
@@ -94,15 +67,59 @@ public class TransferServiceImpl implements TransferService {
                 .map(transferMapper::toResponse);
     }
 
-    private void validateCardStatus(Card card) {
+    // --- Validation --- //
+
+    private void validateTransferRequest(TransferRequest request) {
+        if (request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw BusinessException.invalidTransferAmount();
+        }
+        if (request.getSourceCardId().equals(request.getDestinationCardId())) {
+            throw BusinessException.sameCardTransfer();
+        }
+    }
+
+    private void validateCardForTransfer(Card card) {
         if (card.getStatus() == CardStatus.BLOCKED) {
             throw BusinessException.cardBlocked(card.getId());
         }
-
         if (card.getStatus() == CardStatus.EXPIRED) {
             throw BusinessException.cardExpired(card.getId());
         }
     }
+
+    private void validateSufficientFunds(Card sourceCard, BigDecimal amount) {
+        if (sourceCard.getBalance().compareTo(amount) < 0) {
+            throw BusinessException.insufficientFunds(amount, sourceCard.getBalance());
+        }
+    }
+
+    // --- Lookup --- //
+
+    private Card findCardById(Long cardId) {
+        return cardRepository.findById(cardId)
+                .orElseThrow(() -> ResourceNotFoundException.card(cardId));
+    }
+
+    // --- Transfer execution --- //
+
+    private void executeBalanceTransfer(Card source, Card destination, BigDecimal amount) {
+        source.setBalance(source.getBalance().subtract(amount));
+        destination.setBalance(destination.getBalance().add(amount));
+    }
+
+    private Transfer createTransfer(TransferRequest request, Card source, Card destination) {
+        Transfer transfer = Transfer.builder()
+                .sourceCard(source)
+                .destinationCard(destination)
+                .amount(request.getAmount())
+                .description(request.getDescription())
+                .status(TransferStatus.SUCCESS)
+                .build();
+
+        return transferRepository.save(transfer);
+    }
+
+    // --- Events --- //
 
     private void publishTransferEvent(Transfer transfer, Card sourceCard, Card destinationCard) {
         TransferEvent event = new TransferEvent(

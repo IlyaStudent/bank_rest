@@ -36,30 +36,18 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserDto createUser(CreateUserRequest createUserRequest) {
-        String username = createUserRequest.getUsername();
-        String email = createUserRequest.getEmail();
-        String password = createUserRequest.getPassword();
+        log.debug("Creating user: username='{}'", createUserRequest.getUsername());
 
-        log.debug("Creating user: username='{}'", username);
-
-        if (userRepository.existsByUsername(username)) {
-            throw ResourceExistsException.username(username);
-        }
-
-        if (userRepository.existsByEmail(email)) {
-            throw ResourceExistsException.email(email);
-        }
+        validateUniqueUsername(createUserRequest.getUsername(), null);
+        validateUniqueEmail(createUserRequest.getEmail(), null);
 
         User user = userMapper.createUser(createUserRequest);
-        user.setPassword(passwordEncoder.encode(password));
-
-        Set<String> requestedRoles = createUserRequest.getRoles();
-
-        setUserRoles(requestedRoles, user);
+        user.setPassword(passwordEncoder.encode(createUserRequest.getPassword()));
+        setUserRoles(user, createUserRequest.getRoles());
 
         user = userRepository.save(user);
 
-        log.info("User created: id={}, username='{}'", user.getId(), username);
+        log.info("User created: id={}, username='{}'", user.getId(), user.getUsername());
 
         return userMapper.toDto(user);
     }
@@ -67,10 +55,7 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(readOnly = true)
     public UserDto getUserById(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> ResourceNotFoundException.user(userId));
-
-        return userMapper.toDto(user);
+        return userMapper.toDto(findUserById(userId));
     }
 
     @Override
@@ -94,39 +79,12 @@ public class UserServiceImpl implements UserService {
     public UserDto updateUser(Long userId, UpdateUserRequest updateUserRequest) {
         log.debug("Updating user id={}", userId);
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> ResourceNotFoundException.user(userId));
+        User user = findUserById(userId);
 
-        String newUsername = updateUserRequest.getUsername();
-        String newEmail = updateUserRequest.getEmail();
-        String newPassword = updateUserRequest.getPassword();
-
-        Set<String> requestedRoles = updateUserRequest.getRoles();
-
-        String oldUsername = user.getUsername();
-        String oldEmail = user.getEmail();
-
-        if (newUsername != null && !newUsername.isBlank()) {
-            if (!oldUsername.equals(newUsername) && userRepository.existsByUsername(newUsername)) {
-                throw ResourceExistsException.username(newUsername);
-            }
-            user.setUsername(newUsername);
-        }
-
-        if (newEmail != null && !newEmail.isBlank()) {
-            if (!oldEmail.equals(newEmail) && userRepository.existsByEmail(newEmail)) {
-                throw ResourceExistsException.email(newEmail);
-            }
-            user.setEmail(newEmail);
-        }
-
-        if (newPassword != null && !newPassword.isBlank()) {
-            user.setPassword(passwordEncoder.encode(newPassword));
-        }
-
-        if (requestedRoles != null && !requestedRoles.isEmpty()) {
-            setUserRoles(requestedRoles, user);
-        }
+        updateUsername(user, updateUserRequest.getUsername());
+        updateEmail(user, updateUserRequest.getEmail());
+        updatePassword(user, updateUserRequest.getPassword());
+        updateRoles(user, updateUserRequest.getRoles());
 
         user = userRepository.save(user);
 
@@ -151,11 +109,8 @@ public class UserServiceImpl implements UserService {
     public UserDto assignRole(Long userId, RoleType roleType) {
         log.debug("Assigning role: userId={}, role={}", userId, roleType);
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> ResourceNotFoundException.user(userId));
-        Role role = roleRepository.findByName(roleType)
-                .orElseThrow(() -> ResourceNotFoundException.role(roleType));
-
+        User user = findUserById(userId);
+        Role role = findRole(roleType);
         user.getRoles().add(role);
 
         user = userRepository.save(user);
@@ -165,27 +120,84 @@ public class UserServiceImpl implements UserService {
         return userMapper.toDto(user);
     }
 
-    private void setUserRoles(Set<String> requestedRoles, User user) {
-        if (requestedRoles == null || requestedRoles.isEmpty()) {
-            Role defaultRole = roleRepository.findByName(RoleType.USER)
-                    .orElseThrow(() -> ResourceNotFoundException.role(RoleType.USER));
-            user.getRoles().add(defaultRole);
-        } else {
-            Set<Role> roles = requestedRoles
-                    .stream()
-                    .map(roleName -> {
-                        RoleType roleType;
-                        try {
-                            roleType = RoleType.valueOf(roleName);
-                        } catch (IllegalArgumentException e) {
-                            throw BusinessException.invalidRole(roleName);
-                        }
-                        return roleRepository.findByName(roleType)
-                                .orElseThrow(() -> ResourceNotFoundException.role(roleType));
-                    })
-                    .collect(Collectors.toSet());
+    // --- Lookup --- //
 
-            user.setRoles(roles);
+    private User findUserById(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> ResourceNotFoundException.user(userId));
+    }
+
+    private Role findRole(RoleType roleType) {
+        return roleRepository.findByName(roleType)
+                .orElseThrow(() -> ResourceNotFoundException.role(roleType));
+    }
+
+    // --- Validation --- //
+
+    private void validateUniqueUsername(String newUsername, String currentUsername) {
+        if (newUsername != null && !newUsername.equals(currentUsername)
+                && userRepository.existsByUsername(newUsername)) {
+            throw ResourceExistsException.username(newUsername);
+        }
+    }
+
+    private void validateUniqueEmail(String newEmail, String currentEmail) {
+        if (newEmail != null && !newEmail.equals(currentEmail)
+                && userRepository.existsByEmail(newEmail)) {
+            throw ResourceExistsException.email(newEmail);
+        }
+    }
+
+    // --- Field updates --- //
+
+    private void updateUsername(User user, String newUsername) {
+        if (newUsername != null && !newUsername.isBlank()) {
+            validateUniqueUsername(newUsername, user.getUsername());
+            user.setUsername(newUsername);
+        }
+    }
+
+    private void updateEmail(User user, String newEmail) {
+        if (newEmail != null && !newEmail.isBlank()) {
+            validateUniqueEmail(newEmail, user.getEmail());
+            user.setEmail(newEmail);
+        }
+    }
+
+    private void updatePassword(User user, String newPassword) {
+        if (newPassword != null && !newPassword.isBlank()) {
+            user.setPassword(passwordEncoder.encode(newPassword));
+        }
+    }
+
+    private void updateRoles(User user, Set<String> requestedRoles) {
+        if (requestedRoles != null && !requestedRoles.isEmpty()) {
+            setUserRoles(user, requestedRoles);
+        }
+    }
+
+    // --- Role management --- //
+
+    private void setUserRoles(User user, Set<String> requestedRoles) {
+        if (requestedRoles == null || requestedRoles.isEmpty()) {
+            user.getRoles().add(findRole(RoleType.USER));
+        } else {
+            user.setRoles(resolveRoles(requestedRoles));
+        }
+    }
+
+    private Set<Role> resolveRoles(Set<String> roleNames) {
+        return roleNames.stream()
+                .map(this::parseRoleType)
+                .map(this::findRole)
+                .collect(Collectors.toSet());
+    }
+
+    private RoleType parseRoleType(String roleName) {
+        try {
+            return RoleType.valueOf(roleName);
+        } catch (IllegalArgumentException e) {
+            throw BusinessException.invalidRole(roleName);
         }
     }
 }
