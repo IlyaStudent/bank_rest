@@ -13,3 +13,7 @@ databaseChangeLog:
       file: db/migration/V006__insert_initial_roles.yaml
   - include:
       file: db/migration/V007__insert_admin_user.yaml
+  - include:
+      file: db/migration/V008__create_refresh_tokens_table.yaml
+  - include:
+      file: db/migration/V009__drop_refresh_tokens_table.yaml

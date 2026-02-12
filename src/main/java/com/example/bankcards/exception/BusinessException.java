@@ -41,4 +41,8 @@ public class BusinessException extends RuntimeException {
     public static BusinessException invalidRole(String roleName) {
         return new BusinessException(ApiErrorMessage.INVALID_ROLE.getMessage(roleName));
     }
+
+    public static BusinessException invalidExpiryDate(String expiryDate) {
+        return new BusinessException(ApiErrorMessage.INVALID_EXPIRY_DATE.getMessage(expiryDate));
+    }
 }

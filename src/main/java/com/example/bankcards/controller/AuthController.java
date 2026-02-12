@@ -68,8 +68,13 @@ public class AuthController {
     @PostMapping("${end.point.logout}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void logout(
-            @Valid @RequestBody RefreshRequest refreshRequest
+            @Valid @RequestBody RefreshRequest refreshRequest,
+            @RequestHeader(value = "Authorization", required = false) String authHeader
     ) {
-        authService.logout(refreshRequest.getRefreshToken());
+        String accessToken = null;
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            accessToken = authHeader.substring(7);
+        }
+        authService.logout(refreshRequest.getRefreshToken(), accessToken);
     }
 }

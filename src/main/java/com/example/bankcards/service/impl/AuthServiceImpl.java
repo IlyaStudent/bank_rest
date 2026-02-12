@@ -4,7 +4,6 @@ import com.example.bankcards.dto.authentication.AuthResponse;
 import com.example.bankcards.dto.authentication.LoginRequest;
 import com.example.bankcards.dto.authentication.RefreshRequest;
 import com.example.bankcards.dto.authentication.RegisterRequest;
-import com.example.bankcards.entity.RefreshToken;
 import com.example.bankcards.entity.Role;
 import com.example.bankcards.entity.RoleType;
 import com.example.bankcards.entity.User;
@@ -13,20 +12,17 @@ import com.example.bankcards.exception.BusinessException;
 import com.example.bankcards.exception.ResourceExistsException;
 import com.example.bankcards.exception.ResourceNotFoundException;
 import com.example.bankcards.mapper.UserMapper;
-import com.example.bankcards.repository.RefreshTokenRepository;
 import com.example.bankcards.repository.RoleRepository;
 import com.example.bankcards.repository.UserRepository;
 import com.example.bankcards.security.JwtProvider;
 import com.example.bankcards.service.AuthService;
+import com.example.bankcards.service.RedisTokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 
 @Slf4j
 @Service
@@ -35,10 +31,13 @@ import java.time.temporal.ChronoUnit;
 public class AuthServiceImpl implements AuthService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
-    private final RefreshTokenRepository refreshTokenRepository;
+    private final RedisTokenService redisTokenService;
     private final UserMapper userMapper;
     private final JwtProvider jwtProvider;
     private final PasswordEncoder passwordEncoder;
+
+    @Value("${app.jwt.refresh-expiration}")
+    private Long refreshExpiration;
 
     @Override
     public AuthResponse register(RegisterRequest registerRequest) {
@@ -65,20 +64,21 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public AuthResponse refresh(RefreshRequest refreshRequest) {
-        RefreshToken stored = validateAndRevokeRefreshToken(refreshRequest.getRefreshToken());
-        return buildAuthResponse(stored.getUser());
+        String refreshToken = refreshRequest.getRefreshToken();
+
+        User user = getUserByRefreshToken(refreshToken);
+        redisTokenService.deleteRefreshToken(refreshToken);
+
+        return buildAuthResponse(user);
     }
 
     @Override
-    public void logout(String refreshToken) {
-        refreshTokenRepository.findByToken(refreshToken)
-                .ifPresent(this::revokeToken);
-    }
+    public void logout(String refreshToken, String accessToken) {
+        redisTokenService.deleteRefreshToken(refreshToken);
 
-    @Scheduled(cron = "0 0 3 * * *", zone = "Europe/Moscow")
-    @Transactional
-    public void cleanupExpiredTokens() {
-        refreshTokenRepository.deleteExpired(Instant.now());
+        if (accessToken != null) {
+            blackListAccessToken(accessToken);
+        }
     }
 
     // --- Validation --- //
@@ -126,7 +126,7 @@ public class AuthServiceImpl implements AuthService {
     private AuthResponse buildAuthResponse(User user) {
         String accessToken = jwtProvider.generateAccessToken(user);
         String refreshToken = jwtProvider.generateRefreshToken();
-        saveRefreshToken(refreshToken, user);
+        redisTokenService.saveRefreshToken(refreshToken, user.getId(), refreshExpiration);
 
         return AuthResponse.builder()
                 .accessToken(accessToken)
@@ -136,29 +136,26 @@ public class AuthServiceImpl implements AuthService {
                 .build();
     }
 
-    private RefreshToken validateAndRevokeRefreshToken(String token) {
-        RefreshToken stored = refreshTokenRepository.findByToken(token)
-                .orElseThrow(AuthException::invalidRefreshToken);
+    private User getUserByRefreshToken(String token) {
+        Long userId = redisTokenService.getUserIdByRefreshToken(token);
 
-        if (stored.getRevoked() || stored.getExpiresAt().isBefore(Instant.now())) {
+        if (userId == null) {
             throw AuthException.invalidRefreshToken();
         }
 
-        revokeToken(stored);
-        return stored;
+        return userRepository.findById(userId)
+                .orElseThrow(AuthException::invalidRefreshToken);
     }
 
-    private void saveRefreshToken(String token, User user) {
-        RefreshToken refreshEntity = RefreshToken.builder()
-                .token(token)
-                .user(user)
-                .expiresAt(Instant.now().plus(7, ChronoUnit.DAYS))
-                .build();
-        refreshTokenRepository.save(refreshEntity);
-    }
-
-    private void revokeToken(RefreshToken token) {
-        token.setRevoked(true);
-        refreshTokenRepository.save(token);
+    private void blackListAccessToken(String accessToken) {
+        try {
+            String jti = jwtProvider.getJti(accessToken);
+            if (jti != null) {
+                Long remainingTtl = jwtProvider.getRemainingTtlMillis(accessToken);
+                redisTokenService.blacklistAccessToken(jti, remainingTtl);
+            }
+        } catch (Exception e) {
+            log.warn("Could not blacklist access token during logout", e);
+        }
     }
 }

@@ -333,14 +333,14 @@ class AuthControllerTest {
             RefreshRequest logoutRequest = RefreshRequest.builder()
                     .refreshToken(refreshToken)
                     .build();
-            doNothing().when(authService).logout(anyString());
+            doNothing().when(authService).logout(anyString(), any());
 
             mockMvc.perform(post(LOGOUT_URL)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(logoutRequest)))
                     .andExpect(status().isNoContent());
 
-            verify(authService).logout(refreshToken);
+            verify(authService).logout(eq(refreshToken), any());
         }
 
         @Test
@@ -354,7 +354,7 @@ class AuthControllerTest {
                             .content(objectMapper.writeValueAsString(invalidRequest)))
                     .andExpect(status().isBadRequest());
 
-            verify(authService, never()).logout(any());
+            verify(authService, never()).logout(any(), any());
         }
 
         @Test
@@ -363,14 +363,14 @@ class AuthControllerTest {
             RefreshRequest logoutRequest = RefreshRequest.builder()
                     .refreshToken("nonexistent-token")
                     .build();
-            doNothing().when(authService).logout(anyString());
+            doNothing().when(authService).logout(anyString(), any());
 
             mockMvc.perform(post(LOGOUT_URL)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(logoutRequest)))
                     .andExpect(status().isNoContent());
 
-            verify(authService).logout("nonexistent-token");
+            verify(authService).logout(eq("nonexistent-token"), any());
         }
     }
 }

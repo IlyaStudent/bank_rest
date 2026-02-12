@@ -1,0 +1,7 @@
+databaseChangeLog:
+  - changeSet:
+      id: drop-refresh-tokens-table
+      author: developer
+      changes:
+        - dropTable:
+            tableName: refresh_tokens

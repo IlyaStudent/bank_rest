@@ -28,6 +28,7 @@ public enum ApiErrorMessage {
     SAME_CARD_TRANSFER("Cannot transfer to the same card"),
     INVALID_TRANSFER_AMOUNT("Transfer amount must be positive"),
     PASSWORDS_DO_NOT_MATCH("Passwords must be equals"),
+    INVALID_EXPIRY_DATE("Invalid expiry date format: %s"),
 
     // Authentication errors (401)
     INVALID_CREDENTIALS("Invalid username or password"),

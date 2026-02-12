@@ -5,7 +5,6 @@ import com.example.bankcards.dto.authentication.LoginRequest;
 import com.example.bankcards.dto.authentication.RefreshRequest;
 import com.example.bankcards.dto.authentication.RegisterRequest;
 import com.example.bankcards.dto.user.UserDto;
-import com.example.bankcards.entity.RefreshToken;
 import com.example.bankcards.entity.Role;
 import com.example.bankcards.entity.RoleType;
 import com.example.bankcards.entity.User;
@@ -14,10 +13,10 @@ import com.example.bankcards.exception.BusinessException;
 import com.example.bankcards.exception.ResourceExistsException;
 import com.example.bankcards.exception.ResourceNotFoundException;
 import com.example.bankcards.mapper.UserMapper;
-import com.example.bankcards.repository.RefreshTokenRepository;
 import com.example.bankcards.repository.RoleRepository;
 import com.example.bankcards.repository.UserRepository;
 import com.example.bankcards.security.JwtProvider;
+import com.example.bankcards.service.RedisTokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -28,6 +27,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
 import java.util.HashSet;
@@ -37,9 +37,8 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceImplTest {
@@ -50,7 +49,7 @@ class AuthServiceImplTest {
     private RoleRepository roleRepository;
 
     @Mock
-    private RefreshTokenRepository refreshTokenRepository;
+    private RedisTokenService redisTokenService;
 
     @Mock
     private UserMapper userMapper;
@@ -69,7 +68,6 @@ class AuthServiceImplTest {
     private User user;
     private UserDto userDto;
     private Role role;
-    private RefreshToken storedToken;
     private String username;
     private String email;
     private String password;
@@ -80,6 +78,8 @@ class AuthServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        ReflectionTestUtils.setField(authService, "refreshExpiration", 604800000L);
+
         username = "test";
         email = "test@example.com";
         password = "password";
@@ -119,14 +119,6 @@ class AuthServiceImplTest {
                 .username(username)
                 .password(password)
                 .build();
-
-        storedToken = RefreshToken.builder()
-                .id(1L)
-                .token(refreshToken)
-                .user(user)
-                .expiresAt(Instant.now().plusSeconds(3600))
-                .revoked(false)
-                .build();
     }
 
     @Nested
@@ -144,7 +136,6 @@ class AuthServiceImplTest {
             when(jwtProvider.generateAccessToken(any(User.class))).thenReturn(accessToken);
             when(jwtProvider.generateRefreshToken()).thenReturn(refreshToken);
             when(jwtProvider.getAccessTokenExpiration()).thenReturn(expiresIn);
-            when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(i -> i.getArgument(0));
             when(userMapper.toDto(any(User.class))).thenReturn(userDto);
 
             AuthResponse result = authService.register(registerRequest);
@@ -162,7 +153,7 @@ class AuthServiceImplTest {
             verify(userRepository).save(any(User.class));
             verify(jwtProvider).generateAccessToken(any(User.class));
             verify(jwtProvider).generateRefreshToken();
-            verify(refreshTokenRepository).save(any(RefreshToken.class));
+            verify(redisTokenService).saveRefreshToken(eq(refreshToken), eq(1L), eq(604800000L));
             verify(userMapper).toDto(any(User.class));
         }
 
@@ -231,7 +222,6 @@ class AuthServiceImplTest {
             when(jwtProvider.generateAccessToken(any(User.class))).thenReturn(accessToken);
             when(jwtProvider.generateRefreshToken()).thenReturn(refreshToken);
             when(jwtProvider.getAccessTokenExpiration()).thenReturn(expiresIn);
-            when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(i -> i.getArgument(0));
             when(userMapper.toDto(any(User.class))).thenReturn(userDto);
 
             authService.register(registerRequest);
@@ -254,7 +244,6 @@ class AuthServiceImplTest {
             when(jwtProvider.generateAccessToken(any(User.class))).thenReturn(accessToken);
             when(jwtProvider.generateRefreshToken()).thenReturn(refreshToken);
             when(jwtProvider.getAccessTokenExpiration()).thenReturn(expiresIn);
-            when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(i -> i.getArgument(0));
             when(userMapper.toDto(any(User.class))).thenReturn(userDto);
 
             authService.register(registerRequest);
@@ -280,7 +269,6 @@ class AuthServiceImplTest {
             when(jwtProvider.generateAccessToken(user)).thenReturn(accessToken);
             when(jwtProvider.generateRefreshToken()).thenReturn(refreshToken);
             when(jwtProvider.getAccessTokenExpiration()).thenReturn(expiresIn);
-            when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(i -> i.getArgument(0));
             when(userMapper.toDto(user)).thenReturn(userDto);
 
             AuthResponse result = authService.login(loginRequest);
@@ -295,7 +283,7 @@ class AuthServiceImplTest {
             verify(passwordEncoder).matches(password, encodedPassword);
             verify(jwtProvider).generateAccessToken(user);
             verify(jwtProvider).generateRefreshToken();
-            verify(refreshTokenRepository).save(any(RefreshToken.class));
+            verify(redisTokenService).saveRefreshToken(eq(refreshToken), eq(1L), eq(604800000L));
             verify(userMapper).toDto(user);
         }
 
@@ -357,12 +345,10 @@ class AuthServiceImplTest {
         @Test
         @DisplayName("Should refresh tokens successfully")
         void shouldRefreshTokensSuccessfully() {
-
             String newAccessToken = "new_access_token";
             String newRefreshToken = "new_refresh_token";
-
-            when(refreshTokenRepository.findByToken(refreshToken)).thenReturn(Optional.of(storedToken));
-            when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(i -> i.getArgument(0));
+            when(redisTokenService.getUserIdByRefreshToken(refreshToken)).thenReturn(1L);
+            when(userRepository.findById(1L)).thenReturn(Optional.of(user));
             when(jwtProvider.generateAccessToken(user)).thenReturn(newAccessToken);
             when(jwtProvider.generateRefreshToken()).thenReturn(newRefreshToken);
             when(jwtProvider.getAccessTokenExpiration()).thenReturn(expiresIn);
@@ -375,55 +361,16 @@ class AuthServiceImplTest {
             assertThat(result.getRefreshToken()).isEqualTo(newRefreshToken);
             assertThat(result.getExpiresIn()).isEqualTo(expiresIn);
             assertThat(result.getUser()).isEqualTo(userDto);
-            assertThat(storedToken.getRevoked()).isTrue();
-
-            verify(refreshTokenRepository).findByToken(refreshToken);
+            verify(redisTokenService).deleteRefreshToken(refreshToken);
+            verify(redisTokenService).saveRefreshToken(eq(newRefreshToken), eq(1L), eq(604800000L));
         }
 
         @Test
         @DisplayName("Should throw exception when refresh token not found")
         void shouldThrowExceptionWhenRefreshTokenNotFound() {
-            when(refreshTokenRepository.findByToken("invalid_token")).thenReturn(Optional.empty());
+            when(redisTokenService.getUserIdByRefreshToken("invalid_token")).thenReturn(null);
 
             RefreshRequest request = RefreshRequest.builder().refreshToken("invalid_token").build();
-
-            assertThatThrownBy(() -> authService.refresh(request))
-                    .isInstanceOf(AuthException.class);
-        }
-
-        @Test
-        @DisplayName("Should throw exception when refresh token is revoked")
-        void shouldThrowExceptionWhenRefreshTokenIsRevoked() {
-            RefreshToken revokedToken = RefreshToken.builder()
-                    .id(1L)
-                    .token(refreshToken)
-                    .user(user)
-                    .expiresAt(Instant.now().plusSeconds(3600))
-                    .revoked(true)
-                    .build();
-
-            when(refreshTokenRepository.findByToken(refreshToken)).thenReturn(Optional.of(revokedToken));
-
-            RefreshRequest request = RefreshRequest.builder().refreshToken(refreshToken).build();
-
-            assertThatThrownBy(() -> authService.refresh(request))
-                    .isInstanceOf(AuthException.class);
-        }
-
-        @Test
-        @DisplayName("Should throw exception when refresh token is expired")
-        void shouldThrowExceptionWhenRefreshTokenIsExpired() {
-            RefreshToken expiredToken = RefreshToken.builder()
-                    .id(1L)
-                    .token(refreshToken)
-                    .user(user)
-                    .expiresAt(Instant.now().minusSeconds(3600))
-                    .revoked(false)
-                    .build();
-
-            when(refreshTokenRepository.findByToken(refreshToken)).thenReturn(Optional.of(expiredToken));
-
-            RefreshRequest request = RefreshRequest.builder().refreshToken(refreshToken).build();
 
             assertThatThrownBy(() -> authService.refresh(request))
                     .isInstanceOf(AuthException.class);
@@ -435,25 +382,36 @@ class AuthServiceImplTest {
     class Logout {
 
         @Test
-        @DisplayName("Should revoke refresh token on logout")
-        void shouldRevokeRefreshTokenOnLogout() {
-            when(refreshTokenRepository.findByToken(refreshToken)).thenReturn(Optional.of(storedToken));
-            when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(i -> i.getArgument(0));
+        @DisplayName("Should delete refresh token and blacklist access token on logout")
+        void shouldDeleteRefreshTokenAndBlacklistAccessToken() {
+            String testAccessToken = "test.access.token";
+            when(jwtProvider.getJti(testAccessToken)).thenReturn("test-jti");
+            when(jwtProvider.getRemainingTtlMillis(testAccessToken)).thenReturn(300000L);
 
-            authService.logout(refreshToken);
+            authService.logout(refreshToken, testAccessToken);
 
-            assertThat(storedToken.getRevoked()).isTrue();
-            verify(refreshTokenRepository).save(storedToken);
+            verify(redisTokenService).deleteRefreshToken(refreshToken);
+            verify(redisTokenService).blacklistAccessToken("test-jti", 300000L);
         }
 
         @Test
-        @DisplayName("Should do nothing when refresh token not found on logout")
-        void shouldDoNothingWhenRefreshTokenNotFoundOnLogout() {
-            when(refreshTokenRepository.findByToken("unknown_token")).thenReturn(Optional.empty());
+        @DisplayName("Should delete refresh token when no access token provided")
+        void shouldDeleteRefreshTokenWhenNoAccessToken() {
+            authService.logout(refreshToken, null);
 
-            authService.logout("unknown_token");
+            verify(redisTokenService).deleteRefreshToken(refreshToken);
+            verify(redisTokenService, never()).blacklistAccessToken(any(), any());
+        }
 
-            verify(refreshTokenRepository, never()).save(any());
+        @Test
+        @DisplayName("Should delete refresh token even when blacklist fails")
+        void shouldDeleteRefreshTokenEvenOnBlacklistError() {
+            String testAccessToken = "test.access.token";
+            when(jwtProvider.getJti(testAccessToken)).thenThrow(new RuntimeException("parse error"));
+
+            authService.logout(refreshToken, testAccessToken);
+
+            verify(redisTokenService).deleteRefreshToken(refreshToken);
         }
     }
 }

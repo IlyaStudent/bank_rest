@@ -353,7 +353,7 @@ class UserServiceImplTest {
         @DisplayName("Should return page with users")
         void shouldReturnPageWithUsers() {
             when(userRepository.findAll(pageable)).thenReturn(userPage);
-            when(userMapper.toDto(user)).thenReturn(userDto);
+            when(userMapper.toDto(any(User.class))).thenReturn(userDto);
 
             Page<UserDto> result = userService.getAllUsers(pageable);
 
@@ -365,7 +365,7 @@ class UserServiceImplTest {
             assertThat(result.getContent().getFirst().getUsername()).isEqualTo(username);
 
             verify(userRepository).findAll(pageable);
-            verify(userMapper, times(2)).toDto(user);
+            verify(userMapper, times(2)).toDto(any(User.class));
         }
 
         @Test

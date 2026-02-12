@@ -38,6 +38,7 @@ public class JwtProvider {
 
     public String generateAccessToken(User user) {
         return Jwts.builder()
+                .id(UUID.randomUUID().toString())
                 .subject(user.getId().toString())
                 .claim(CLAIM_USERNAME, user.getUsername())
                 .claim(CLAIM_ROLES, getRoles(user))
@@ -70,6 +71,16 @@ public class JwtProvider {
     @NonNull
     public Instant getAccessTokenExpiration() {
         return Instant.now().plus(Duration.ofMillis(accessExpiration));
+    }
+
+    public String getJti(String token) {
+        return getAllClaimsFromToken(token).getId();
+    }
+
+    public Long getRemainingTtlMillis(String token) {
+        Date expiration = getAllClaimsFromToken(token).getExpiration();
+        long remaining = expiration.getTime() - System.currentTimeMillis();
+        return Math.max(remaining, 0);
     }
 
     private List<String> getRoles(User user) {

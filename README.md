@@ -1,6 +1,6 @@
 # Bank Cards Management API
 
-REST API для управления банковскими картами с JWT-аутентификацией (Access + Refresh токены), ролевой моделью доступа, шифрованием данных и интеграцией с Apache Kafka.
+REST API для управления банковскими картами с JWT-аутентификацией (Access + Refresh токены), ролевой моделью доступа, шифрованием данных, Redis для управления токенами и интеграцией с Apache Kafka.
 
 ## Архитектура системы
 
@@ -29,7 +29,7 @@ openssl rand -base64 32
 
 ## Запуск
 
-### 1. Запуск инфраструктуры (PostgreSQL + Kafka)
+### 1. Запуск инфраструктуры (PostgreSQL + Kafka + Redis)
 
 ```bash
 docker-compose up -d
@@ -56,15 +56,16 @@ cd ../bank_notification_service
 
 ## Технологии
 
-| Компонент | Технологии |
-|-----------|-----------|
-| **Backend** | Java 21, Spring Boot 3.2 |
-| **Security** | Spring Security, JWT, AES-256 |
-| **Database** | PostgreSQL, Spring Data JPA, Liquibase |
-| **Messaging** | Apache Kafka, Spring Kafka |
-| **Docs** | Swagger/OpenAPI |
-| **Testing** | JUnit 5, Mockito |
-| **Infrastructure** | Docker Compose |
+| Компонент | Технологии                                |
+|-----------|-------------------------------------------|
+| **Backend** | Java 21, Spring Boot 3.2                  |
+| **Security** | Spring Security, JWT, AES-256             |
+| **Database** | PostgreSQL 15, Spring Data JPA, Liquibase |
+| **Caching/Tokens** | Redis 7, Spring Data Redis                |
+| **Messaging** | Apache Kafka, Spring Kafka                |
+| **Docs** | Swagger/OpenAPI                           |
+| **Testing** | JUnit 5, Mockito, Spring Security Test    |
+| **Infrastructure** | Docker Compose                            |
 
 ## Структура проекта
 
@@ -86,7 +87,7 @@ bank_rest/
 ├── src/main/resources/
 │   ├── application.yml
 │   └── db/migration/    # Liquibase миграции
-├── docker-compose.yml   # PostgreSQL + Kafka + Zookeeper
+├── docker-compose.yml   # PostgreSQL + Kafka + Zookeeper + Redis
 └── pom.xml
 ```
 
@@ -94,21 +95,27 @@ bank_rest/
 
 | Роль | Функционал |
 |------|-----------|
-| **ADMIN** | CRUD пользователей, создание/удаление карт, просмотр всех карт |
-| **USER** | Просмотр своих карт, запрос блокировки, переводы между картами |
+| **ADMIN** | CRUD пользователей, создание/удаление карт, назначение ролей, просмотр всех карт |
+| **USER** | Просмотр своих карт, запрос блокировки, переводы между картами, история переводов |
 
 **Безопасность:**
 - JWT Access + Refresh токены (stateless аутентификация)
-- Access Token (15 мин) — авторизация запросов
+- Access Token (15 мин) — авторизация запросов, содержит `jti` (JWT ID) для идентификации
 - Refresh Token (7 дней) — обновление пары токенов без повторного логина
-- Token Rotation — при refresh старый токен отзывается, выдаётся новый
+- Token Rotation — при refresh старый токен удаляется, выдаётся новый
+- Access Token Blacklist — при logout access token мгновенно отзывается через Redis
 - Шифрование номеров карт (AES-256-GCM)
 - Маскирование при отображении (`**** **** **** 1234`)
 - Ролевая модель доступа (RBAC)
+- Хеширование паролей (BCrypt)
 
 **Kafka интеграция:**
 - При успешном переводе публикуется `TransferEvent` в топик `bank.transfers`
 - Notification Service получает события и логирует уведомления
+
+**Redis интеграция:**
+- Хранение Refresh Token с автоматическим удалением по TTL (7 дней)
+- Blacklist Access Token при logout с TTL равным оставшемуся времени жизни токена
 
 ## API Endpoints
 
@@ -118,7 +125,7 @@ bank_rest/
 | POST | `/api/auth/register` | Регистрация, получение Access + Refresh токенов |
 | POST | `/api/auth/login` | Авторизация, получение Access + Refresh токенов |
 | POST | `/api/auth/refresh` | Обновление пары токенов по Refresh Token |
-| POST | `/api/auth/logout` | Отзыв Refresh Token (выход из сессии) |
+| POST | `/api/auth/logout` | Отзыв Refresh Token + blacklist Access Token |
 
 ### Карты
 | Метод | Endpoint | Описание | Роль |
@@ -154,18 +161,24 @@ bank_rest/
 1. POST /api/auth/login        → { accessToken, refreshToken, expiresIn, user }
 2. GET  /api/cards              → Authorization: Bearer <accessToken>
 3. Access Token истёк (401)     → POST /api/auth/refresh { refreshToken }
-4. Получены новые токены        → старый Refresh Token отозван (Token Rotation)
-5. POST /api/auth/logout        → Refresh Token отозван, сессия завершена
+4. Получены новые токены        → старый Refresh Token удалён из Redis (Token Rotation)
+5. POST /api/auth/logout        → Refresh Token удалён + Access Token в blacklist
+6. GET  /api/cards (после logout) → 401 (Access Token в blacklist)
 ```
 
 ### Хранение токенов
 
 | Токен | Сервер | Клиент |
 |-------|--------|--------|
-| **Access Token** | Не хранится (stateless JWT) | localStorage / memory |
-| **Refresh Token** | Таблица `refresh_tokens` в БД | localStorage / httpOnly cookie |
+| **Access Token** | Не хранится (stateless JWT, jti в blacklist при logout) | localStorage / memory |
+| **Refresh Token** | Redis (`refresh:{token}` → userId, TTL 7 дней) | localStorage / httpOnly cookie |
 
-```
+### Redis ключи
+
+| Паттерн | Значение | TTL | Описание |
+|---------|----------|-----|----------|
+| `refresh:{uuid}` | userId | 7 дней | Refresh token → ID пользователя |
+| `blacklist:{jti}` | `"1"` | Оставшееся время жизни Access Token | Отозванные Access Token |
 
 ## Тестирование
 
@@ -185,25 +198,7 @@ bank_rest/
 **Service тесты** (Unit с Mockito):
 - Бизнес-логика
 - Обработка исключений
-- Взаимодействие с репозиториями
-
-## Kafka команды
-
-```bash
-# Список топиков
-docker exec bank_rest_kafka kafka-topics --list --bootstrap-server localhost:9092
-
-# Просмотр сообщений в топике
-docker exec bank_rest_kafka kafka-console-consumer \
-  --bootstrap-server localhost:9092 \
-  --topic bank.transfers \
-  --from-beginning
-
-# Информация о consumer group
-docker exec bank_rest_kafka kafka-consumer-groups \
-  --bootstrap-server localhost:9092 \
-  --describe --group bank_notification_service
-```
+- Взаимодействие с репозиториями и Redis
 
 ## Связанные проекты
 

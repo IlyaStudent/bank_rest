@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 
 @Slf4j
 @Service
@@ -121,7 +122,11 @@ public class CardServiceImpl implements CardService {
     }
 
     private LocalDate parseExpiryDate(String expiryDate) {
-        return YearMonth.parse(expiryDate, EXPIRY_DATE_FORMATTER).atEndOfMonth();
+        try {
+            return YearMonth.parse(expiryDate, EXPIRY_DATE_FORMATTER).atEndOfMonth();
+        } catch (DateTimeParseException e) {
+            throw BusinessException.invalidExpiryDate(expiryDate);
+        }
     }
 
     // --- Status management --- //

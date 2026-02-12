@@ -1,5 +1,6 @@
 package com.example.bankcards.security;
 
+import com.example.bankcards.service.RedisTokenService;
 import com.example.bankcards.util.constants.ApiErrorMessage;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.MalformedJwtException;
@@ -29,6 +30,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtProvider jwtProvider;
     private final CustomUserDetailService userDetailService;
+    private final RedisTokenService redisTokenService;
 
     @Override
     protected void doFilterInternal(
@@ -44,6 +46,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String jwt = authHeader.substring(BEARER_PREFIX.length());
             try {
                 if (!jwtProvider.validateToken(jwt)) {
+                    sendErrorResponse(response, HttpStatus.UNAUTHORIZED, ApiErrorMessage.TOKEN_EXPIRED.getMessage());
+                    return;
+                }
+
+                String jti = jwtProvider.getJti(jwt);
+                if (jti != null && redisTokenService.isAccessTokenBlackListed(jti)) {
                     sendErrorResponse(response, HttpStatus.UNAUTHORIZED, ApiErrorMessage.TOKEN_EXPIRED.getMessage());
                     return;
                 }
