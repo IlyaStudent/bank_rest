@@ -2,8 +2,10 @@ package com.example.bankcards.service.impl;
 
 import com.example.bankcards.dto.authentication.AuthResponse;
 import com.example.bankcards.dto.authentication.LoginRequest;
+import com.example.bankcards.dto.authentication.RefreshRequest;
 import com.example.bankcards.dto.authentication.RegisterRequest;
 import com.example.bankcards.dto.user.UserDto;
+import com.example.bankcards.entity.RefreshToken;
 import com.example.bankcards.entity.Role;
 import com.example.bankcards.entity.RoleType;
 import com.example.bankcards.entity.User;
@@ -12,6 +14,7 @@ import com.example.bankcards.exception.BusinessException;
 import com.example.bankcards.exception.ResourceExistsException;
 import com.example.bankcards.exception.ResourceNotFoundException;
 import com.example.bankcards.mapper.UserMapper;
+import com.example.bankcards.repository.RefreshTokenRepository;
 import com.example.bankcards.repository.RoleRepository;
 import com.example.bankcards.repository.UserRepository;
 import com.example.bankcards.security.JwtProvider;
@@ -47,6 +50,9 @@ class AuthServiceImplTest {
     private RoleRepository roleRepository;
 
     @Mock
+    private RefreshTokenRepository refreshTokenRepository;
+
+    @Mock
     private UserMapper userMapper;
 
     @Mock
@@ -63,11 +69,13 @@ class AuthServiceImplTest {
     private User user;
     private UserDto userDto;
     private Role role;
+    private RefreshToken storedToken;
     private String username;
     private String email;
     private String password;
     private String encodedPassword;
-    private String token;
+    private String accessToken;
+    private String refreshToken;
     private Instant expiresIn;
 
     @BeforeEach
@@ -76,7 +84,8 @@ class AuthServiceImplTest {
         email = "test@example.com";
         password = "password";
         encodedPassword = "encoded_password";
-        token = "jwt_token";
+        accessToken = "jwt_access_token";
+        refreshToken = "refresh_token_uuid";
         expiresIn = Instant.ofEpochSecond(3600000L);
 
         role = Role.builder()
@@ -110,6 +119,14 @@ class AuthServiceImplTest {
                 .username(username)
                 .password(password)
                 .build();
+
+        storedToken = RefreshToken.builder()
+                .id(1L)
+                .token(refreshToken)
+                .user(user)
+                .expiresAt(Instant.now().plusSeconds(3600))
+                .revoked(false)
+                .build();
     }
 
     @Nested
@@ -124,14 +141,17 @@ class AuthServiceImplTest {
             when(passwordEncoder.encode(password)).thenReturn(encodedPassword);
             when(roleRepository.findByName(RoleType.USER)).thenReturn(Optional.of(role));
             when(userRepository.save(any(User.class))).thenReturn(user);
-            when(jwtProvider.generateToken(any(User.class))).thenReturn(token);
-            when(jwtProvider.getTokenExpiration()).thenReturn(expiresIn);
+            when(jwtProvider.generateAccessToken(any(User.class))).thenReturn(accessToken);
+            when(jwtProvider.generateRefreshToken()).thenReturn(refreshToken);
+            when(jwtProvider.getAccessTokenExpiration()).thenReturn(expiresIn);
+            when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(i -> i.getArgument(0));
             when(userMapper.toDto(any(User.class))).thenReturn(userDto);
 
             AuthResponse result = authService.register(registerRequest);
 
             assertThat(result).isNotNull();
-            assertThat(result.getToken()).isEqualTo(token);
+            assertThat(result.getAccessToken()).isEqualTo(accessToken);
+            assertThat(result.getRefreshToken()).isEqualTo(refreshToken);
             assertThat(result.getExpiresIn()).isEqualTo(expiresIn);
             assertThat(result.getUser()).isEqualTo(userDto);
 
@@ -140,7 +160,9 @@ class AuthServiceImplTest {
             verify(passwordEncoder).encode(password);
             verify(roleRepository).findByName(RoleType.USER);
             verify(userRepository).save(any(User.class));
-            verify(jwtProvider).generateToken(any(User.class));
+            verify(jwtProvider).generateAccessToken(any(User.class));
+            verify(jwtProvider).generateRefreshToken();
+            verify(refreshTokenRepository).save(any(RefreshToken.class));
             verify(userMapper).toDto(any(User.class));
         }
 
@@ -206,8 +228,10 @@ class AuthServiceImplTest {
             when(passwordEncoder.encode(password)).thenReturn(encodedPassword);
             when(roleRepository.findByName(RoleType.USER)).thenReturn(Optional.of(role));
             when(userRepository.save(any(User.class))).thenReturn(user);
-            when(jwtProvider.generateToken(any(User.class))).thenReturn(token);
-            when(jwtProvider.getTokenExpiration()).thenReturn(expiresIn);
+            when(jwtProvider.generateAccessToken(any(User.class))).thenReturn(accessToken);
+            when(jwtProvider.generateRefreshToken()).thenReturn(refreshToken);
+            when(jwtProvider.getAccessTokenExpiration()).thenReturn(expiresIn);
+            when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(i -> i.getArgument(0));
             when(userMapper.toDto(any(User.class))).thenReturn(userDto);
 
             authService.register(registerRequest);
@@ -227,8 +251,10 @@ class AuthServiceImplTest {
             when(passwordEncoder.encode(password)).thenReturn(encodedPassword);
             when(roleRepository.findByName(RoleType.USER)).thenReturn(Optional.of(role));
             when(userRepository.save(any(User.class))).thenReturn(user);
-            when(jwtProvider.generateToken(any(User.class))).thenReturn(token);
-            when(jwtProvider.getTokenExpiration()).thenReturn(expiresIn);
+            when(jwtProvider.generateAccessToken(any(User.class))).thenReturn(accessToken);
+            when(jwtProvider.generateRefreshToken()).thenReturn(refreshToken);
+            when(jwtProvider.getAccessTokenExpiration()).thenReturn(expiresIn);
+            when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(i -> i.getArgument(0));
             when(userMapper.toDto(any(User.class))).thenReturn(userDto);
 
             authService.register(registerRequest);
@@ -251,20 +277,25 @@ class AuthServiceImplTest {
         void shouldLoginSuccessfully() {
             when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(password, encodedPassword)).thenReturn(true);
-            when(jwtProvider.generateToken(user)).thenReturn(token);
-            when(jwtProvider.getTokenExpiration()).thenReturn(expiresIn);
+            when(jwtProvider.generateAccessToken(user)).thenReturn(accessToken);
+            when(jwtProvider.generateRefreshToken()).thenReturn(refreshToken);
+            when(jwtProvider.getAccessTokenExpiration()).thenReturn(expiresIn);
+            when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(i -> i.getArgument(0));
             when(userMapper.toDto(user)).thenReturn(userDto);
 
             AuthResponse result = authService.login(loginRequest);
 
             assertThat(result).isNotNull();
-            assertThat(result.getToken()).isEqualTo(token);
+            assertThat(result.getAccessToken()).isEqualTo(accessToken);
+            assertThat(result.getRefreshToken()).isEqualTo(refreshToken);
             assertThat(result.getExpiresIn()).isEqualTo(expiresIn);
             assertThat(result.getUser()).isEqualTo(userDto);
 
             verify(userRepository).findByUsername(username);
             verify(passwordEncoder).matches(password, encodedPassword);
-            verify(jwtProvider).generateToken(user);
+            verify(jwtProvider).generateAccessToken(user);
+            verify(jwtProvider).generateRefreshToken();
+            verify(refreshTokenRepository).save(any(RefreshToken.class));
             verify(userMapper).toDto(user);
         }
 
@@ -278,7 +309,7 @@ class AuthServiceImplTest {
 
             verify(userRepository).findByUsername(username);
             verify(passwordEncoder, never()).matches(any(), any());
-            verify(jwtProvider, never()).generateToken(any(User.class));
+            verify(jwtProvider, never()).generateAccessToken(any(User.class));
         }
 
         @Test
@@ -292,7 +323,7 @@ class AuthServiceImplTest {
 
             verify(userRepository).findByUsername(username);
             verify(passwordEncoder).matches(password, encodedPassword);
-            verify(jwtProvider, never()).generateToken(any(User.class));
+            verify(jwtProvider, never()).generateAccessToken(any(User.class));
         }
 
         @Test
@@ -316,6 +347,113 @@ class AuthServiceImplTest {
                     .isInstanceOf(AuthException.class)
                     .extracting(Throwable::getMessage)
                     .isNotNull();
+        }
+    }
+
+    @Nested
+    @DisplayName("refresh")
+    class Refresh {
+
+        @Test
+        @DisplayName("Should refresh tokens successfully")
+        void shouldRefreshTokensSuccessfully() {
+
+            String newAccessToken = "new_access_token";
+            String newRefreshToken = "new_refresh_token";
+
+            when(refreshTokenRepository.findByToken(refreshToken)).thenReturn(Optional.of(storedToken));
+            when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(i -> i.getArgument(0));
+            when(jwtProvider.generateAccessToken(user)).thenReturn(newAccessToken);
+            when(jwtProvider.generateRefreshToken()).thenReturn(newRefreshToken);
+            when(jwtProvider.getAccessTokenExpiration()).thenReturn(expiresIn);
+            when(userMapper.toDto(user)).thenReturn(userDto);
+
+            RefreshRequest request = RefreshRequest.builder().refreshToken(refreshToken).build();
+            AuthResponse result = authService.refresh(request);
+
+            assertThat(result.getAccessToken()).isEqualTo(newAccessToken);
+            assertThat(result.getRefreshToken()).isEqualTo(newRefreshToken);
+            assertThat(result.getExpiresIn()).isEqualTo(expiresIn);
+            assertThat(result.getUser()).isEqualTo(userDto);
+            assertThat(storedToken.getRevoked()).isTrue();
+
+            verify(refreshTokenRepository).findByToken(refreshToken);
+        }
+
+        @Test
+        @DisplayName("Should throw exception when refresh token not found")
+        void shouldThrowExceptionWhenRefreshTokenNotFound() {
+            when(refreshTokenRepository.findByToken("invalid_token")).thenReturn(Optional.empty());
+
+            RefreshRequest request = RefreshRequest.builder().refreshToken("invalid_token").build();
+
+            assertThatThrownBy(() -> authService.refresh(request))
+                    .isInstanceOf(AuthException.class);
+        }
+
+        @Test
+        @DisplayName("Should throw exception when refresh token is revoked")
+        void shouldThrowExceptionWhenRefreshTokenIsRevoked() {
+            RefreshToken revokedToken = RefreshToken.builder()
+                    .id(1L)
+                    .token(refreshToken)
+                    .user(user)
+                    .expiresAt(Instant.now().plusSeconds(3600))
+                    .revoked(true)
+                    .build();
+
+            when(refreshTokenRepository.findByToken(refreshToken)).thenReturn(Optional.of(revokedToken));
+
+            RefreshRequest request = RefreshRequest.builder().refreshToken(refreshToken).build();
+
+            assertThatThrownBy(() -> authService.refresh(request))
+                    .isInstanceOf(AuthException.class);
+        }
+
+        @Test
+        @DisplayName("Should throw exception when refresh token is expired")
+        void shouldThrowExceptionWhenRefreshTokenIsExpired() {
+            RefreshToken expiredToken = RefreshToken.builder()
+                    .id(1L)
+                    .token(refreshToken)
+                    .user(user)
+                    .expiresAt(Instant.now().minusSeconds(3600))
+                    .revoked(false)
+                    .build();
+
+            when(refreshTokenRepository.findByToken(refreshToken)).thenReturn(Optional.of(expiredToken));
+
+            RefreshRequest request = RefreshRequest.builder().refreshToken(refreshToken).build();
+
+            assertThatThrownBy(() -> authService.refresh(request))
+                    .isInstanceOf(AuthException.class);
+        }
+    }
+
+    @Nested
+    @DisplayName("logout")
+    class Logout {
+
+        @Test
+        @DisplayName("Should revoke refresh token on logout")
+        void shouldRevokeRefreshTokenOnLogout() {
+            when(refreshTokenRepository.findByToken(refreshToken)).thenReturn(Optional.of(storedToken));
+            when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(i -> i.getArgument(0));
+
+            authService.logout(refreshToken);
+
+            assertThat(storedToken.getRevoked()).isTrue();
+            verify(refreshTokenRepository).save(storedToken);
+        }
+
+        @Test
+        @DisplayName("Should do nothing when refresh token not found on logout")
+        void shouldDoNothingWhenRefreshTokenNotFoundOnLogout() {
+            when(refreshTokenRepository.findByToken("unknown_token")).thenReturn(Optional.empty());
+
+            authService.logout("unknown_token");
+
+            verify(refreshTokenRepository, never()).save(any());
         }
     }
 }

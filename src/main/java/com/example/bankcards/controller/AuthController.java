@@ -2,6 +2,7 @@ package com.example.bankcards.controller;
 
 import com.example.bankcards.dto.authentication.AuthResponse;
 import com.example.bankcards.dto.authentication.LoginRequest;
+import com.example.bankcards.dto.authentication.RefreshRequest;
 import com.example.bankcards.dto.authentication.RegisterRequest;
 import com.example.bankcards.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -45,5 +46,30 @@ public class AuthController {
             @Valid @RequestBody LoginRequest loginRequest
     ) {
         return authService.login(loginRequest);
+    }
+
+    @Operation(summary = "Refresh", description = "Refreshes user access token and return new access token")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Refresh successful"),
+            @ApiResponse(responseCode = "401", description = "Invalid credentials")
+    })
+    @PostMapping("${end.point.refresh}")
+    public AuthResponse refresh(
+            @Valid @RequestBody RefreshRequest refreshRequest
+    ) {
+        return authService.refresh(refreshRequest);
+    }
+
+    @Operation(summary = "Logout", description = "Delete user session")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Logout successful"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized")
+    })
+    @PostMapping("${end.point.logout}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void logout(
+            @Valid @RequestBody RefreshRequest refreshRequest
+    ) {
+        authService.logout(refreshRequest.getRefreshToken());
     }
 }

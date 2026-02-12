@@ -33,6 +33,7 @@ public enum ApiErrorMessage {
     INVALID_CREDENTIALS("Invalid username or password"),
     TOKEN_EXPIRED("Token has expired"),
     INVALID_TOKEN_SIGNATURE("Invalid token signature"),
+    INVALID_REFRESH_TOKEN("Invalid or expired refresh token"),
 
     // General errors (500)
     ENCRYPTION_FAILED("Encryption failed"),

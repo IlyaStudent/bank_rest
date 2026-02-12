@@ -19,4 +19,8 @@ public class AuthException extends RuntimeException {
     public static AuthException invalidTokenSignature() {
         return new AuthException(ApiErrorMessage.INVALID_TOKEN_SIGNATURE.getMessage());
     }
+
+    public static AuthException invalidRefreshToken() {
+        return new AuthException(ApiErrorMessage.INVALID_REFRESH_TOKEN.getMessage());
+    }
 }

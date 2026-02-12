@@ -13,15 +13,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Component
@@ -29,87 +26,62 @@ import java.util.stream.Collectors;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
-    private static final String LOGIN_PATH = "/api/auth/login";
-    private static final String REGISTER_PATH = "/api/auth/register";
 
     private final JwtProvider jwtProvider;
+    private final CustomUserDetailService userDetailService;
 
     @Override
     protected void doFilterInternal(
             @NonNull HttpServletRequest request,
             @NonNull HttpServletResponse response,
             @NonNull FilterChain filterChain
-    )
-            throws ServletException, IOException {
+    ) throws ServletException, IOException {
 
-        Optional<String> authHeader = Optional.ofNullable(request.getHeader(AUTHORIZATION_HEADER));
+        String authHeader = request.getHeader(AUTHORIZATION_HEADER);
         String requestURI = request.getRequestURI();
 
-        if (authHeader.isPresent() && authHeader.get().startsWith(BEARER_PREFIX)) {
-            String jwt = authHeader.get().substring(BEARER_PREFIX.length());
+        if (authHeader != null && authHeader.startsWith(BEARER_PREFIX)) {
+            String jwt = authHeader.substring(BEARER_PREFIX.length());
             try {
                 if (!jwtProvider.validateToken(jwt)) {
-                    throw new ExpiredJwtException(null, null, ApiErrorMessage.TOKEN_EXPIRED.getMessage());
+                    sendErrorResponse(response, HttpStatus.UNAUTHORIZED, ApiErrorMessage.TOKEN_EXPIRED.getMessage());
+                    return;
                 }
 
-                Optional<String> emailOpt = Optional.ofNullable(jwtProvider.getEmail(jwt));
-                emailOpt.ifPresent(email -> {
-                    if (SecurityContextHolder.getContext().getAuthentication() == null) {
-                        List<SimpleGrantedAuthority> authorities = jwtProvider.getRoles(jwt).stream()
-                                .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
-                                .collect(Collectors.toList());
+                String username = jwtProvider.getUsername(jwt);
+                if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                    UserDetails userDetails = userDetailService.loadUserByUsername(username);
 
-                        UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
-                                email,
-                                null,
-                                authorities
-                        );
-                        SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+                    UsernamePasswordAuthenticationToken authenticationToken =
+                            new UsernamePasswordAuthenticationToken(
+                                    userDetails,
+                                    null,
+                                    userDetails.getAuthorities()
+                            );
+                    SecurityContextHolder.getContext().setAuthentication(authenticationToken);
 
-                        log.debug("User authenticated: email='{}', uri={}", email, requestURI);
-                    }
-                });
+                    log.debug("User authenticated: username='{}', uri={}", username, requestURI);
+                }
 
             } catch (ExpiredJwtException e) {
                 log.warn("JWT token expired: uri={}", requestURI);
-                handleTokenExpiration(requestURI, jwt, response);
+                sendErrorResponse(response, HttpStatus.UNAUTHORIZED, ApiErrorMessage.TOKEN_EXPIRED.getMessage());
                 return;
             } catch (SignatureException | MalformedJwtException e) {
                 log.warn("Invalid JWT signature: uri={}", requestURI);
-                handleSignatureException(response);
+                sendErrorResponse(response, HttpStatus.UNAUTHORIZED, ApiErrorMessage.INVALID_TOKEN_SIGNATURE.getMessage());
                 return;
             } catch (Exception e) {
-                handleUnexpectedException(response, e);
+                log.error(ApiErrorMessage.ERROR_DURING_JWT_PROCESSING.getMessage(), e);
+                sendErrorResponse(response, HttpStatus.INTERNAL_SERVER_ERROR, ApiErrorMessage.UNEXPECTED_ERROR.getMessage());
                 return;
             }
         }
         filterChain.doFilter(request, response);
     }
 
-    private void handleTokenExpiration(String requestURI, String jwt, HttpServletResponse response) throws IOException {
-        if (isAuthEndpoint(requestURI)) {
-            String refreshedToken = jwtProvider.refreshToken(jwt);
-            response.setHeader(AUTHORIZATION_HEADER, BEARER_PREFIX + refreshedToken);
-        } else {
-            sendErrorResponse(response, HttpStatus.UNAUTHORIZED, ApiErrorMessage.TOKEN_EXPIRED.getMessage());
-        }
-    }
-
-    private void handleSignatureException(HttpServletResponse response) throws IOException {
-        sendErrorResponse(response, HttpStatus.UNAUTHORIZED, ApiErrorMessage.INVALID_TOKEN_SIGNATURE.getMessage());
-    }
-
-    private void handleUnexpectedException(HttpServletResponse response, Exception e) throws IOException {
-        log.error(ApiErrorMessage.ERROR_DURING_JWT_PROCESSING.getMessage(), e);
-        sendErrorResponse(response, HttpStatus.INTERNAL_SERVER_ERROR, ApiErrorMessage.UNEXPECTED_ERROR.getMessage());
-    }
-
     private void sendErrorResponse(HttpServletResponse response, HttpStatus status, String message) throws IOException {
         response.setStatus(status.value());
         response.getWriter().write(message);
-    }
-
-    private boolean isAuthEndpoint(String uri) {
-        return uri.equals(LOGIN_PATH) || uri.equals(REGISTER_PATH);
     }
 }

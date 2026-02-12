@@ -45,7 +45,8 @@ app:
     key: ${ENCRYPTION_KEY}
   jwt:
     secret: ${JWT_SECRET}
-    expiration: ${JWT_EXPIRATION:3600000}
+    access-expiration: ${ACCESS_TOKEN_EXPIRATION:900000}
+    refresh-expiration: ${REFRESH_TOKEN_EXPIRATION:604800000}
 
 springdoc:
   swagger-ui:
@@ -67,6 +68,8 @@ end:
     auth: /api/auth
     register: /register
     login: /login
+    logout: /logout
+    refresh: /refresh
 
     cards: /api/cards
     block: /{id}/block

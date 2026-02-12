@@ -4,6 +4,7 @@ import com.example.bankcards.config.SecurityConfig;
 import com.example.bankcards.config.TestSecurityConfig;
 import com.example.bankcards.dto.authentication.AuthResponse;
 import com.example.bankcards.dto.authentication.LoginRequest;
+import com.example.bankcards.dto.authentication.RefreshRequest;
 import com.example.bankcards.dto.authentication.RegisterRequest;
 import com.example.bankcards.dto.user.UserDto;
 import com.example.bankcards.exception.AuthException;
@@ -28,6 +29,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.Instant;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -55,23 +57,28 @@ class AuthControllerTest {
     private RegisterRequest registerRequest;
     private LoginRequest loginRequest;
     private AuthResponse authResponse;
+    private RefreshRequest refreshRequest;
     private String username;
     private String email;
     private String password;
-    private String token;
+    private String accessToken;
+    private String refreshToken;
 
     private static final Instant FIXED_TIMESTAMP = Instant.parse("2026-01-01T12:00:00Z");
 
     private static final String AUTH_URL = "/api/auth";
     private static final String REGISTER_URL = AUTH_URL + "/register";
     private static final String LOGIN_URL = AUTH_URL + "/login";
+    private static final String REFRESH_URL = AUTH_URL + "/refresh";
+    private static final String LOGOUT_URL = AUTH_URL + "/logout";
 
     @BeforeEach
     void setUp() {
         username = "test";
         email = "test@example.com";
         password = "password";
-        token = "jwt.token.here";
+        accessToken = "jwt.access.token.here";
+        refreshToken = "refresh-token-uuid";
 
         registerRequest = RegisterRequest.builder()
                 .username(username)
@@ -92,10 +99,14 @@ class AuthControllerTest {
                 .build();
 
         authResponse = AuthResponse.builder()
-                .token(token)
-                .type("Bearer")
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
                 .expiresIn(FIXED_TIMESTAMP)
                 .user(userDto)
+                .build();
+
+        refreshRequest = RefreshRequest.builder()
+                .refreshToken(refreshToken)
                 .build();
     }
 
@@ -112,8 +123,8 @@ class AuthControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(registerRequest)))
                     .andExpect(status().isCreated())
-                    .andExpect(jsonPath("$.token").value(token))
-                    .andExpect(jsonPath("$.type").value("Bearer"))
+                    .andExpect(jsonPath("$.accessToken").value(accessToken))
+                    .andExpect(jsonPath("$.refreshToken").value(refreshToken))
                     .andExpect(jsonPath("$.user.username").value(username));
 
             verify(authService).register(any(RegisterRequest.class));
@@ -199,8 +210,8 @@ class AuthControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(loginRequest)))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.token").value(token))
-                    .andExpect(jsonPath("$.type").value("Bearer"))
+                    .andExpect(jsonPath("$.accessToken").value(accessToken))
+                    .andExpect(jsonPath("$.refreshToken").value(refreshToken))
                     .andExpect(jsonPath("$.user.username").value(username));
 
             verify(authService).login(any(LoginRequest.class));
@@ -234,6 +245,132 @@ class AuthControllerTest {
                     .andExpect(status().isUnauthorized());
 
             verify(authService).login(any(LoginRequest.class));
+        }
+    }
+
+    @Nested
+    @DisplayName("POST " + REFRESH_URL)
+    class Refresh {
+
+        @Test
+        @DisplayName("Should refresh tokens successfully")
+        void shouldRefreshTokensSuccessfully() throws Exception {
+            String newAccessToken = "new.access.token";
+            String newRefreshToken = "new-refresh-token-uuid";
+            AuthResponse refreshResponse = AuthResponse.builder()
+                    .accessToken(newAccessToken)
+                    .refreshToken(newRefreshToken)
+                    .expiresIn(FIXED_TIMESTAMP)
+                    .build();
+            when(authService.refresh(any(RefreshRequest.class))).thenReturn(refreshResponse);
+
+            mockMvc.perform(post(REFRESH_URL)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(refreshRequest)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.accessToken").value(newAccessToken))
+                    .andExpect(jsonPath("$.refreshToken").value(newRefreshToken));
+
+            verify(authService).refresh(any(RefreshRequest.class));
+        }
+
+        @Test
+        @DisplayName("Should return 400 when refresh token is blank")
+        void shouldReturn400WhenRefreshTokenIsBlank() throws Exception {
+            RefreshRequest invalidRequest = RefreshRequest.builder()
+                    .refreshToken("")
+                    .build();
+            mockMvc.perform(post(REFRESH_URL)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(invalidRequest)))
+                    .andExpect(status().isBadRequest());
+
+            verify(authService, never()).refresh(any());
+        }
+
+        @Test
+        @DisplayName("Should return 401 when refresh token is invalid")
+        void shouldReturn401WhenRefreshTokenIsInvalid() throws Exception {
+            RefreshRequest invalidRequest = RefreshRequest.builder()
+                    .refreshToken("invalid-token")
+                    .build();
+            when(authService.refresh(any(RefreshRequest.class)))
+                    .thenThrow(AuthException.invalidRefreshToken());
+
+            mockMvc.perform(post(REFRESH_URL)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(invalidRequest)))
+                    .andExpect(status().isUnauthorized());
+
+            verify(authService).refresh(any(RefreshRequest.class));
+        }
+
+        @Test
+        @DisplayName("Should return 401 when refresh token is expired")
+        void shouldReturn401WhenRefreshTokenIsExpired() throws Exception {
+            RefreshRequest invalidRequest = RefreshRequest.builder()
+                    .refreshToken("expired-token")
+                    .build();
+            when(authService.refresh(any(RefreshRequest.class)))
+                    .thenThrow(AuthException.invalidRefreshToken());
+
+            mockMvc.perform(post(REFRESH_URL)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(invalidRequest)))
+                    .andExpect(status().isUnauthorized());
+
+            verify(authService).refresh(any(RefreshRequest.class));
+        }
+    }
+
+    @Nested
+    @DisplayName("POST " + LOGOUT_URL)
+    class Logout {
+
+        @Test
+        @DisplayName("Should logout successfully")
+        void shouldLogoutSuccessfully() throws Exception {
+            RefreshRequest logoutRequest = RefreshRequest.builder()
+                    .refreshToken(refreshToken)
+                    .build();
+            doNothing().when(authService).logout(anyString());
+
+            mockMvc.perform(post(LOGOUT_URL)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(logoutRequest)))
+                    .andExpect(status().isNoContent());
+
+            verify(authService).logout(refreshToken);
+        }
+
+        @Test
+        @DisplayName("Should return 400 when refresh token is blank")
+        void shouldReturn400WhenRefreshTokenIsBlank() throws Exception {
+            RefreshRequest invalidRequest = RefreshRequest.builder()
+                    .refreshToken("")
+                    .build();
+            mockMvc.perform(post(LOGOUT_URL)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(invalidRequest)))
+                    .andExpect(status().isBadRequest());
+
+            verify(authService, never()).logout(any());
+        }
+
+        @Test
+        @DisplayName("Should return 204 even when refresh token does not exist")
+        void shouldReturn204WhenRefreshTokenDoesNotExist() throws Exception {
+            RefreshRequest logoutRequest = RefreshRequest.builder()
+                    .refreshToken("nonexistent-token")
+                    .build();
+            doNothing().when(authService).logout(anyString());
+
+            mockMvc.perform(post(LOGOUT_URL)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(logoutRequest)))
+                    .andExpect(status().isNoContent());
+
+            verify(authService).logout("nonexistent-token");
         }
     }
 }

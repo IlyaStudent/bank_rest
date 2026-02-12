@@ -3,7 +3,6 @@ package com.example.bankcards.security;
 import com.example.bankcards.entity.Role;
 import com.example.bankcards.entity.RoleType;
 import com.example.bankcards.entity.User;
-import com.example.bankcards.util.constants.AuthenticationConstants;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -15,44 +14,41 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Component
 public class JwtProvider {
+    private static final String CLAIM_ROLES = "roles";
+    private static final String CLAIM_USERNAME = "username";
+
     private final SecretKey secretKey;
-    private final Long jwtValidityInMilliseconds;
+    private final long accessExpiration;
 
-    public JwtProvider(@Value("${app.jwt.secret}") String secret,
-                       @Value("${app.jwt.expiration}") long jwtValidityInMilliseconds) {
+    public JwtProvider(
+            @Value("${app.jwt.secret}") String secret,
+            @Value("${app.jwt.access-expiration}") long accessExpiration
+    ) {
         this.secretKey = getKey(secret);
-        this.jwtValidityInMilliseconds = jwtValidityInMilliseconds;
+        this.accessExpiration = accessExpiration;
     }
 
-    public String generateToken(@NonNull User user) {
-        Map<String, Object> claims = new HashMap<>();
-        claims.put(AuthenticationConstants.USER_ID, user.getId());
-        claims.put(AuthenticationConstants.USERNAME, user.getUsername());
-        claims.put(AuthenticationConstants.USER_EMAIL, user.getEmail());
-        claims.put(AuthenticationConstants.LAST_UPDATE, LocalDateTime.now().toString());
-
-        List<String> rolesList = user.getRoles().stream()
-                .map(Role::getName)
-                .map(RoleType::name)
-                .collect(Collectors.toList());
-        claims.put(AuthenticationConstants.ROLE, rolesList);
-
-        return createToken(claims, user.getEmail());
+    public String generateAccessToken(User user) {
+        return Jwts.builder()
+                .subject(user.getId().toString())
+                .claim(CLAIM_USERNAME, user.getUsername())
+                .claim(CLAIM_ROLES, getRoles(user))
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + accessExpiration))
+                .signWith(secretKey, Jwts.SIG.HS512)
+                .compact();
     }
 
-    public String refreshToken(String token) {
-        Claims claims = getAllClaimsFromToken(token);
-        return createToken(claims, claims.getSubject());
+    public String generateRefreshToken() {
+        return UUID.randomUUID().toString();
     }
 
     public boolean validateToken(String token) {
@@ -67,12 +63,20 @@ public class JwtProvider {
         }
     }
 
-    public String getEmail(String token) {
-        return getAllClaimsFromToken(token).getSubject();
+    public String getUsername(String token) {
+        return getAllClaimsFromToken(token).get(CLAIM_USERNAME, String.class);
     }
 
-    public List<String> getRoles(String token) {
-        return getAllClaimsFromToken(token).get(AuthenticationConstants.ROLE, List.class);
+    @NonNull
+    public Instant getAccessTokenExpiration() {
+        return Instant.now().plus(Duration.ofMillis(accessExpiration));
+    }
+
+    private List<String> getRoles(User user) {
+        return user.getRoles().stream()
+                .map(Role::getName)
+                .map(RoleType::name)
+                .collect(Collectors.toList());
     }
 
     private Claims getAllClaimsFromToken(String token) {
@@ -91,20 +95,4 @@ public class JwtProvider {
         byte[] decode64 = Decoders.BASE64.decode(secretKey64);
         return Keys.hmacShaKeyFor(decode64);
     }
-
-    private String createToken(Map<String, Object> claims, String subject) {
-        return Jwts.builder()
-                .claims(claims)
-                .subject(subject)
-                .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + jwtValidityInMilliseconds))
-                .signWith(secretKey, Jwts.SIG.HS512)
-                .compact();
-    }
-
-    @NonNull
-    public Instant getTokenExpiration() {
-        return Instant.now().plus(Duration.ofMillis(jwtValidityInMilliseconds));
-    }
 }
-

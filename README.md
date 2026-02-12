@@ -1,6 +1,6 @@
 # Bank Cards Management API
 
-REST API для управления банковскими картами с JWT-аутентификацией, ролевой моделью доступа, шифрованием данных и интеграцией с Apache Kafka.
+REST API для управления банковскими картами с JWT-аутентификацией (Access + Refresh токены), ролевой моделью доступа, шифрованием данных и интеграцией с Apache Kafka.
 
 ## Архитектура системы
 
@@ -98,7 +98,10 @@ bank_rest/
 | **USER** | Просмотр своих карт, запрос блокировки, переводы между картами |
 
 **Безопасность:**
-- JWT-токены с настраиваемым сроком действия
+- JWT Access + Refresh токены (stateless аутентификация)
+- Access Token (15 мин) — авторизация запросов
+- Refresh Token (7 дней) — обновление пары токенов без повторного логина
+- Token Rotation — при refresh старый токен отзывается, выдаётся новый
 - Шифрование номеров карт (AES-256-GCM)
 - Маскирование при отображении (`**** **** **** 1234`)
 - Ролевая модель доступа (RBAC)
@@ -112,8 +115,10 @@ bank_rest/
 ### Аутентификация
 | Метод | Endpoint | Описание |
 |-------|----------|----------|
-| POST | `/api/auth/register` | Регистрация пользователя |
-| POST | `/api/auth/login` | Авторизация, получение JWT |
+| POST | `/api/auth/register` | Регистрация, получение Access + Refresh токенов |
+| POST | `/api/auth/login` | Авторизация, получение Access + Refresh токенов |
+| POST | `/api/auth/refresh` | Обновление пары токенов по Refresh Token |
+| POST | `/api/auth/logout` | Отзыв Refresh Token (выход из сессии) |
 
 ### Карты
 | Метод | Endpoint | Описание | Роль |
@@ -140,6 +145,27 @@ bank_rest/
 | PUT | `/api/users/{id}` | Обновление пользователя | ADMIN |
 | DELETE | `/api/users/{id}` | Удаление пользователя | ADMIN |
 | POST | `/api/users/{id}/roles` | Назначение роли | ADMIN |
+
+## Аутентификация (JWT Access + Refresh)
+
+### Flow
+
+```
+1. POST /api/auth/login        → { accessToken, refreshToken, expiresIn, user }
+2. GET  /api/cards              → Authorization: Bearer <accessToken>
+3. Access Token истёк (401)     → POST /api/auth/refresh { refreshToken }
+4. Получены новые токены        → старый Refresh Token отозван (Token Rotation)
+5. POST /api/auth/logout        → Refresh Token отозван, сессия завершена
+```
+
+### Хранение токенов
+
+| Токен | Сервер | Клиент |
+|-------|--------|--------|
+| **Access Token** | Не хранится (stateless JWT) | localStorage / memory |
+| **Refresh Token** | Таблица `refresh_tokens` в БД | localStorage / httpOnly cookie |
+
+```
 
 ## Тестирование
 
