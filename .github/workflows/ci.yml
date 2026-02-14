@@ -31,6 +31,9 @@ jobs:
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
 
+      - name: Make Maven Wrapper executable
+        run: chmod +x ./mvnw
+
       - name: Build, Test & Analyze
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
