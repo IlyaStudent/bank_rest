@@ -4,7 +4,7 @@
 [![Maintainability](https://sonarcloud.io/api/project_badges/measure?project=IlyaStudent_bank_rest&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=IlyaStudent_bank_rest)
 # Bank Cards Management API
 
-REST API для управления банковскими картами с JWT-аутентификацией (Access + Refresh токены), ролевой моделью доступа, шифрованием данных, Redis для управления токенами и интеграцией с Apache Kafka.
+REST  API для управления банковскими картами с JWT-аутентификацией (Access + Refresh токены), ролевой моделью доступа, шифрованием данных, Redis для управления токенами и интеграцией с Apache Kafka.
 
 ## Архитектура системы
 
