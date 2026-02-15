@@ -94,6 +94,7 @@ public class UserController {
     @ApiResponse(responseCode = "404", description = "User or role not found")
     @ApiResponse(responseCode = "401", description = "Unauthorized")
     @ApiResponse(responseCode = "403", description = "Forbidden - admin access required")
+    @SuppressWarnings("java:S6856")
     @PostMapping("${end.point.assign.role}")
     public UserDto assignRole(
             @Parameter(description = "User ID") @PathVariable(name = "id") Long userId,
