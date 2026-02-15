@@ -7,7 +7,6 @@ import com.example.bankcards.dto.authentication.RegisterRequest;
 import com.example.bankcards.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,11 +22,9 @@ public class AuthController {
     private final AuthService authService;
 
     @Operation(summary = "Register new user", description = "Creates a new user account and returns JWT token")
-    @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "User registered successfully"),
-            @ApiResponse(responseCode = "409", description = "Username or email already exists"),
-            @ApiResponse(responseCode = "422", description = "Passwords do not match")
-    })
+    @ApiResponse(responseCode = "201", description = "User registered successfully")
+    @ApiResponse(responseCode = "409", description = "Username or email already exists")
+    @ApiResponse(responseCode = "422", description = "Passwords do not match")
     @PostMapping("${end.point.register}")
     @ResponseStatus(HttpStatus.CREATED)
     public AuthResponse register(
@@ -37,10 +34,8 @@ public class AuthController {
     }
 
     @Operation(summary = "Login", description = "Authenticates user and returns JWT token")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Login successful"),
-            @ApiResponse(responseCode = "401", description = "Invalid credentials")
-    })
+    @ApiResponse(responseCode = "200", description = "Login successful")
+    @ApiResponse(responseCode = "401", description = "Invalid credentials")
     @PostMapping("${end.point.login}")
     public AuthResponse login(
             @Valid @RequestBody LoginRequest loginRequest
@@ -49,10 +44,8 @@ public class AuthController {
     }
 
     @Operation(summary = "Refresh", description = "Refreshes user access token and return new access token")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Refresh successful"),
-            @ApiResponse(responseCode = "401", description = "Invalid credentials")
-    })
+    @ApiResponse(responseCode = "200", description = "Refresh successful")
+    @ApiResponse(responseCode = "401", description = "Invalid credentials")
     @PostMapping("${end.point.refresh}")
     public AuthResponse refresh(
             @Valid @RequestBody RefreshRequest refreshRequest
@@ -61,10 +54,8 @@ public class AuthController {
     }
 
     @Operation(summary = "Logout", description = "Delete user session")
-    @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Logout successful"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized")
-    })
+    @ApiResponse(responseCode = "204", description = "Logout successful")
+    @ApiResponse(responseCode = "401", description = "Unauthorized")
     @PostMapping("${end.point.logout}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void logout(
