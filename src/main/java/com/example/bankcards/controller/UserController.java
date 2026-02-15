@@ -38,6 +38,7 @@ public class UserController {
     @ApiResponse(responseCode = "404", description = "User not found")
     @ApiResponse(responseCode = "401", description = "Unauthorized")
     @ApiResponse(responseCode = "403", description = "Forbidden - admin access required")
+    @SuppressWarnings("java:S6856")
     @GetMapping("${end.point.id}")
     public UserDto getUser(
             @Parameter(description = "User ID") @PathVariable(name = "id") Long userId
@@ -65,6 +66,7 @@ public class UserController {
     @ApiResponse(responseCode = "409", description = "Username or email already exists")
     @ApiResponse(responseCode = "401", description = "Unauthorized")
     @ApiResponse(responseCode = "403", description = "Forbidden - admin access required")
+    @SuppressWarnings("java:S6856")
     @PutMapping("${end.point.id}")
     public UserDto updateUser(
             @RequestBody @Valid UpdateUserRequest updateUserRequest,
@@ -78,6 +80,7 @@ public class UserController {
     @ApiResponse(responseCode = "404", description = "User not found")
     @ApiResponse(responseCode = "401", description = "Unauthorized")
     @ApiResponse(responseCode = "403", description = "Forbidden - admin access required")
+    @SuppressWarnings("java:S6856")
     @DeleteMapping("${end.point.id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteUser(

@@ -55,6 +55,7 @@ public class CardController {
     @ApiResponse(responseCode = "200", description = "Card found")
     @ApiResponse(responseCode = "404", description = "Card not found")
     @ApiResponse(responseCode = "401", description = "Unauthorized")
+    @SuppressWarnings("java:S6856")
     @GetMapping("${end.point.id}")
     public CardResponse getCardById(
             @Parameter(description = "Card ID") @PathVariable(name = "id") Long cardId
@@ -67,6 +68,7 @@ public class CardController {
     @ApiResponse(responseCode = "404", description = "Card not found")
     @ApiResponse(responseCode = "422", description = "Invalid card status")
     @ApiResponse(responseCode = "401", description = "Unauthorized")
+    @SuppressWarnings("java:S6856")
     @PutMapping("${end.point.id}")
     public CardResponse updateCard(
             @RequestBody @Valid CardUpdateRequest cardUpdateRequest,
@@ -79,6 +81,7 @@ public class CardController {
     @ApiResponse(responseCode = "204", description = "Card deleted successfully")
     @ApiResponse(responseCode = "404", description = "Card not found")
     @ApiResponse(responseCode = "401", description = "Unauthorized")
+    @SuppressWarnings("java:S6856")
     @DeleteMapping("${end.point.id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteCard(
@@ -91,6 +94,7 @@ public class CardController {
     @ApiResponse(responseCode = "200", description = "Card blocked successfully")
     @ApiResponse(responseCode = "404", description = "Card not found")
     @ApiResponse(responseCode = "401", description = "Unauthorized")
+    @SuppressWarnings("java:S6856")
     @PutMapping("${end.point.block}")
     public CardResponse blockCard(
             @Parameter(description = "Card ID") @PathVariable(name = "id") Long cardId
