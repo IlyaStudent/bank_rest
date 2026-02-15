@@ -3,7 +3,6 @@ package com.example.bankcards.util;
 import com.example.bankcards.exception.EncryptionException;
 
 import javax.crypto.Cipher;
-import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -17,9 +16,9 @@ public class EncryptionUtil {
     private static final String TRANSFORMATION = "AES/GCM/NoPadding";
     private static final int GCM_IV_LENGTH = 12;
     private static final int GCM_TAG_LENGTH = 128;
-    private static final int AES_KEY_SIZE = 256;
 
     private final SecretKey secretKey;
+    private final SecureRandom random;
 
     public EncryptionUtil(String base64Key) {
         byte[] keyBytes = Base64.getDecoder().decode(base64Key);
@@ -27,12 +26,13 @@ public class EncryptionUtil {
             throw new IllegalArgumentException("Key must be 32 bytes for AES 256");
         }
         this.secretKey = new SecretKeySpec(keyBytes, ALGORITHM);
+        this.random = new SecureRandom();
     }
 
     public String encrypt(String plainText) {
         try {
             byte[] iv = new byte[GCM_IV_LENGTH];
-            new SecureRandom().nextBytes(iv);
+            random.nextBytes(iv);
 
             Cipher cipher = Cipher.getInstance(TRANSFORMATION);
             cipher.init(Cipher.ENCRYPT_MODE, secretKey, new GCMParameterSpec(GCM_TAG_LENGTH, iv));
@@ -68,17 +68,6 @@ public class EncryptionUtil {
 
         } catch (Exception e) {
             throw EncryptionException.decryptionFailed(e);
-        }
-    }
-
-    public static String generateKey() {
-        try {
-            KeyGenerator keyGen = KeyGenerator.getInstance(ALGORITHM);
-            keyGen.init(AES_KEY_SIZE, new SecureRandom());
-            SecretKey key = keyGen.generateKey();
-            return Base64.getEncoder().encodeToString(key.getEncoded());
-        } catch (Exception e) {
-            throw EncryptionException.encryptionFailed(e);
         }
     }
 }

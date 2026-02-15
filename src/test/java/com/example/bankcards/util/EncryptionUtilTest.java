@@ -11,27 +11,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DisplayName("EncryptionUtil unit tests")
 class EncryptionUtilTest {
 
-    private static final String VALID_BASE64_KEY = EncryptionUtil.generateKey();
-
-    @Nested
-    @DisplayName("generateKey")
-    class GenerateKey {
-
-        @Test
-        @DisplayName("Should return a non‑null Base64 string")
-        void shouldReturnNonNullBase64String() {
-            String key = EncryptionUtil.generateKey();
-            assertThat(key).isNotNull();
-        }
-
-        @Test
-        @DisplayName("Should generate a 32‑byte key encoded in Base64")
-        void shouldGenerate32ByteKey() {
-            String key = EncryptionUtil.generateKey();
-            byte[] decoded = Base64.getDecoder().decode(key);
-            assertThat(decoded).hasSize(32);
-        }
-    }
+    private static final String VALID_BASE64_KEY = KeyGeneratorUtil.generateKey();
 
     @Nested
     @DisplayName("constructor")
@@ -40,8 +20,7 @@ class EncryptionUtilTest {
         @Test
         @DisplayName("Should create instance with valid 32‑byte Base64 key")
         void shouldCreateInstanceWithValidKey() {
-            String validKey = EncryptionUtil.generateKey();
-            EncryptionUtil util = new EncryptionUtil(validKey);
+            EncryptionUtil util = new EncryptionUtil(VALID_BASE64_KEY);
             assertThat(util).isNotNull();
         }
 
