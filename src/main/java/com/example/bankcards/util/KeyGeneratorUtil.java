@@ -1,17 +1,17 @@
 package com.example.bankcards.util;
 
 import com.example.bankcards.exception.EncryptionException;
-import lombok.NoArgsConstructor;
 
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import java.security.SecureRandom;
 import java.util.Base64;
 
-@NoArgsConstructor
 public class KeyGeneratorUtil {
     private static final String ALGORITHM = "AES";
     private static final int AES_KEY_SIZE = 256;
+
+    private KeyGeneratorUtil() {}
 
     public static String generateKey() {
         try {
