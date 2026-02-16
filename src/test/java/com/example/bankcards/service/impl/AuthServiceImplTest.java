@@ -37,7 +37,6 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -153,7 +152,7 @@ class AuthServiceImplTest {
             verify(userRepository).save(any(User.class));
             verify(jwtProvider).generateAccessToken(any(User.class));
             verify(jwtProvider).generateRefreshToken();
-            verify(redisTokenService).saveRefreshToken(eq(refreshToken), eq(1L), eq(604800000L));
+            verify(redisTokenService).saveRefreshToken(refreshToken, 1L, 604800000L);
             verify(userMapper).toDto(any(User.class));
         }
 
@@ -283,7 +282,7 @@ class AuthServiceImplTest {
             verify(passwordEncoder).matches(password, encodedPassword);
             verify(jwtProvider).generateAccessToken(user);
             verify(jwtProvider).generateRefreshToken();
-            verify(redisTokenService).saveRefreshToken(eq(refreshToken), eq(1L), eq(604800000L));
+            verify(redisTokenService).saveRefreshToken(refreshToken, 1L, 604800000L);
             verify(userMapper).toDto(user);
         }
 
@@ -362,7 +361,7 @@ class AuthServiceImplTest {
             assertThat(result.getExpiresIn()).isEqualTo(expiresIn);
             assertThat(result.getUser()).isEqualTo(userDto);
             verify(redisTokenService).deleteRefreshToken(refreshToken);
-            verify(redisTokenService).saveRefreshToken(eq(newRefreshToken), eq(1L), eq(604800000L));
+            verify(redisTokenService).saveRefreshToken(newRefreshToken, 1L, 604800000L);
         }
 
         @Test

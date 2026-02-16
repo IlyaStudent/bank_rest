@@ -390,7 +390,7 @@ class TransferServiceImplTest {
 
             assertThat(result).isNotNull();
             assertThat(result.getContent()).isEmpty();
-            assertThat(result.getTotalElements()).isEqualTo(0);
+            assertThat(result.getTotalElements()).isZero();
             assertThat(result.hasContent()).isFalse();
 
             verify(transferRepository).findBySourceCardOwnerIdOrDestinationCardOwnerId(userId, userId, pageable);

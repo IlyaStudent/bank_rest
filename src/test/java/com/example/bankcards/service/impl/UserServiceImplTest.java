@@ -360,7 +360,7 @@ class UserServiceImplTest {
             assertThat(result).isNotNull();
             assertThat(result.getContent()).hasSize(2);
             assertThat(result.getTotalElements()).isEqualTo(2);
-            assertThat(result.getNumber()).isEqualTo(0);
+            assertThat(result.getNumber()).isZero();
             assertThat(result.getSize()).isEqualTo(10);
             assertThat(result.getContent().getFirst().getUsername()).isEqualTo(username);
 
@@ -379,7 +379,7 @@ class UserServiceImplTest {
 
             assertThat(result).isNotNull();
             assertThat(result.getContent()).isEmpty();
-            assertThat(result.getTotalElements()).isEqualTo(0);
+            assertThat(result.getTotalElements()).isZero();
             assertThat(result.hasContent()).isFalse();
 
             verify(userRepository).findAll(pageable);

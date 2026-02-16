@@ -11,7 +11,7 @@ public class ExpiryDateValidator implements ConstraintValidator<ExpiryDate, Stri
             String expiryDate,
             ConstraintValidatorContext constraintValidatorContext
     ) {
-        if (expiryDate == null || !expiryDate.matches("^(0[1-9]|1[0-2])/[0-9]{2}$")) {
+        if (expiryDate == null || !expiryDate.matches("^(0[1-9]|1[0-2])/\\d{2}$")) {
             return false;
         }
 

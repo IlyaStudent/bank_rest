@@ -22,8 +22,8 @@ import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class KafkaProducerServiceImplTest {
@@ -86,7 +86,7 @@ class KafkaProducerServiceImplTest {
 
         kafkaProducerService.sendTransferEvent(transferEvent);
 
-        verify(kafkaTemplate).send(eq(TOPIC), eq("1"), eq(transferEvent));
+        verify(kafkaTemplate).send(TOPIC, "1", transferEvent);
     }
 
     @Test
@@ -111,7 +111,7 @@ class KafkaProducerServiceImplTest {
 
         future.complete(sendResult);
 
-        verify(kafkaTemplate).send(eq(TOPIC), eq("1"), eq(transferEvent));
+        verify(kafkaTemplate).send(TOPIC, "1", transferEvent);
     }
 
     @Test
@@ -125,7 +125,7 @@ class KafkaProducerServiceImplTest {
 
         future.completeExceptionally(new RuntimeException("Kafka unavailable"));
 
-        verify(kafkaTemplate).send(eq(TOPIC), eq("1"), eq(transferEvent));
+        verify(kafkaTemplate).send(TOPIC, "1", transferEvent);
     }
 
     @Test
