@@ -40,52 +40,68 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
 
         String authHeader = request.getHeader(AUTHORIZATION_HEADER);
+
+        if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        String jwt = authHeader.substring(BEARER_PREFIX.length());
         String requestURI = request.getRequestURI();
 
-        if (authHeader != null && authHeader.startsWith(BEARER_PREFIX)) {
-            String jwt = authHeader.substring(BEARER_PREFIX.length());
-            try {
-                if (!jwtProvider.validateToken(jwt)) {
-                    sendErrorResponse(response, HttpStatus.UNAUTHORIZED, ApiErrorMessage.TOKEN_EXPIRED.getMessage());
-                    return;
-                }
-
-                String jti = jwtProvider.getJti(jwt);
-                if (jti != null && redisTokenService.isAccessTokenBlackListed(jti)) {
-                    sendErrorResponse(response, HttpStatus.UNAUTHORIZED, ApiErrorMessage.TOKEN_EXPIRED.getMessage());
-                    return;
-                }
-
-                String username = jwtProvider.getUsername(jwt);
-                if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                    UserDetails userDetails = userDetailService.loadUserByUsername(username);
-
-                    UsernamePasswordAuthenticationToken authenticationToken =
-                            new UsernamePasswordAuthenticationToken(
-                                    userDetails,
-                                    null,
-                                    userDetails.getAuthorities()
-                            );
-                    SecurityContextHolder.getContext().setAuthentication(authenticationToken);
-
-                    log.debug("User authenticated: username='{}', uri={}", username, requestURI);
-                }
-
-            } catch (ExpiredJwtException e) {
-                log.warn("JWT token expired: uri={}", requestURI);
+        try {
+            if (!isTokenValid(jwt)) {
                 sendErrorResponse(response, HttpStatus.UNAUTHORIZED, ApiErrorMessage.TOKEN_EXPIRED.getMessage());
                 return;
-            } catch (SignatureException | MalformedJwtException e) {
-                log.warn("Invalid JWT signature: uri={}", requestURI);
-                sendErrorResponse(response, HttpStatus.UNAUTHORIZED, ApiErrorMessage.INVALID_TOKEN_SIGNATURE.getMessage());
-                return;
-            } catch (Exception e) {
-                log.error(ApiErrorMessage.ERROR_DURING_JWT_PROCESSING.getMessage(), e);
-                sendErrorResponse(response, HttpStatus.INTERNAL_SERVER_ERROR, ApiErrorMessage.UNEXPECTED_ERROR.getMessage());
+            }
+
+            if (isTokenBlackListed(jwt)) {
+                sendErrorResponse(response, HttpStatus.UNAUTHORIZED, ApiErrorMessage.TOKEN_EXPIRED.getMessage());
                 return;
             }
+
+            trySetAuthentication(jwt, requestURI);
+
+        } catch (ExpiredJwtException e) {
+            log.warn("JWT token expired: uri={}", requestURI);
+            sendErrorResponse(response, HttpStatus.UNAUTHORIZED, ApiErrorMessage.TOKEN_EXPIRED.getMessage());
+            return;
+        } catch (SignatureException | MalformedJwtException e) {
+            log.warn("Invalid JWT signature: uri={}", requestURI);
+            sendErrorResponse(response, HttpStatus.UNAUTHORIZED, ApiErrorMessage.INVALID_TOKEN_SIGNATURE.getMessage());
+            return;
+        } catch (Exception e) {
+            log.error(ApiErrorMessage.ERROR_DURING_JWT_PROCESSING.getMessage(), e);
+            sendErrorResponse(response, HttpStatus.INTERNAL_SERVER_ERROR, ApiErrorMessage.UNEXPECTED_ERROR.getMessage());
+            return;
         }
         filterChain.doFilter(request, response);
+    }
+
+    private boolean isTokenValid(String jwt) {
+        return jwtProvider.validateToken(jwt);
+    }
+
+    private boolean isTokenBlackListed(String jwt) {
+        String jti = jwtProvider.getJti(jwt);
+        return jti != null && redisTokenService.isAccessTokenBlackListed(jti);
+    }
+
+    private void trySetAuthentication(String jwt, String requestURI) {
+        String username = jwtProvider.getUsername(jwt);
+        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            UserDetails userDetails = userDetailService.loadUserByUsername(username);
+
+            UsernamePasswordAuthenticationToken authenticationToken =
+                    new UsernamePasswordAuthenticationToken(
+                            userDetails,
+                            null,
+                            userDetails.getAuthorities()
+                    );
+            SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+
+            log.debug("User authenticated: username='{}', uri={}", username, requestURI);
+        }
     }
 
     private void sendErrorResponse(HttpServletResponse response, HttpStatus status, String message) throws IOException {
