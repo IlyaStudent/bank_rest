@@ -135,15 +135,19 @@ public class UserServiceImpl implements UserService {
     // --- Validation --- //
 
     private void validateUniqueUsername(String newUsername, String currentUsername) {
-        Boolean userExists = userRepository.existsByUsername(newUsername);
-        if (newUsername != null && !newUsername.equals(currentUsername) && userExists) {
+        if (newUsername == null || newUsername.equals(currentUsername)) {
+            return;
+        }
+        if (userRepository.existsByUsername(newUsername)) {
             throw ResourceExistsException.username(newUsername);
         }
     }
 
     private void validateUniqueEmail(String newEmail, String currentEmail) {
-        Boolean userExists = userRepository.existsByEmail(newEmail);
-        if (newEmail != null && !newEmail.equals(currentEmail) && userExists) {
+        if (newEmail == null || newEmail.equals(currentEmail)) {
+            return;
+        }
+        if (userRepository.existsByEmail(newEmail)) {
             throw ResourceExistsException.email(newEmail);
         }
     }

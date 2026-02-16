@@ -2,6 +2,7 @@
 [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=IlyaStudent_bank_rest&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=IlyaStudent_bank_rest)
 [![Bugs](https://sonarcloud.io/api/project_badges/measure?project=IlyaStudent_bank_rest&metric=bugs)](https://sonarcloud.io/summary/new_code?id=IlyaStudent_bank_rest)
 [![Duplicated Lines (%)](https://sonarcloud.io/api/project_badges/measure?project=IlyaStudent_bank_rest&metric=duplicated_lines_density)](https://sonarcloud.io/summary/new_code?id=IlyaStudent_bank_rest)
+[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=IlyaStudent_bank_rest&metric=code_smells)](https://sonarcloud.io/summary/new_code?id=IlyaStudent_bank_rest)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=IlyaStudent_bank_rest&metric=coverage)](https://sonarcloud.io/summary/new_code?id=IlyaStudent_bank_rest)
 [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=IlyaStudent_bank_rest&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=IlyaStudent_bank_rest)
 [![Maintainability](https://sonarcloud.io/api/project_badges/measure?project=IlyaStudent_bank_rest&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=IlyaStudent_bank_rest)
