@@ -138,7 +138,9 @@ public class UserServiceImpl implements UserService {
         if (newUsername == null || newUsername.equals(currentUsername)) {
             return;
         }
-        if (userRepository.existsByUsername(newUsername)) {
+
+        Boolean userExists = userRepository.existsByUsername(newUsername);
+        if (userExists) {
             throw ResourceExistsException.username(newUsername);
         }
     }
@@ -147,7 +149,9 @@ public class UserServiceImpl implements UserService {
         if (newEmail == null || newEmail.equals(currentEmail)) {
             return;
         }
-        if (userRepository.existsByEmail(newEmail)) {
+
+        Boolean userExists = userRepository.existsByEmail(newEmail);
+        if (userExists) {
             throw ResourceExistsException.email(newEmail);
         }
     }
