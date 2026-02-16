@@ -1,6 +1,9 @@
 [![CI](https://github.com/IlyaStudent/bank_rest/actions/workflows/ci.yml/badge.svg)](https://github.com/IlyaStudent/bank_rest/actions/workflows/ci.yml)
 [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=IlyaStudent_bank_rest&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=IlyaStudent_bank_rest)
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=IlyaStudent_bank_rest&metric=bugs)](https://sonarcloud.io/summary/new_code?id=IlyaStudent_bank_rest)
+[![Duplicated Lines (%)](https://sonarcloud.io/api/project_badges/measure?project=IlyaStudent_bank_rest&metric=duplicated_lines_density)](https://sonarcloud.io/summary/new_code?id=IlyaStudent_bank_rest)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=IlyaStudent_bank_rest&metric=coverage)](https://sonarcloud.io/summary/new_code?id=IlyaStudent_bank_rest)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=IlyaStudent_bank_rest&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=IlyaStudent_bank_rest)
 [![Maintainability](https://sonarcloud.io/api/project_badges/measure?project=IlyaStudent_bank_rest&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=IlyaStudent_bank_rest)
 # Bank Cards Management API
 
@@ -22,11 +25,11 @@ cp .env.example .env
 
 Генерация ключей:
 ```bash
-# ENCRYPTION_KEY
-openssl rand -base64 32
+# ENCRYPTION_KEY (AES-256, 32 байта) — через утилиту проекта
+./mvnw -q compile && java -cp target/classes com.example.bankcards.util.KeyGeneratorUtil
 
-# JWT_SECRET
-openssl rand -base64 32
+# JWT_SECRET (HS512, минимум 64 байта)
+openssl rand -base64 64
 ```
 
 > **Важно:** Приложение не запустится без `ENCRYPTION_KEY` и `JWT_SECRET` (fail fast).
@@ -193,16 +196,15 @@ bank_rest/
 
 ### Покрытие тестами
 
-**Controller тесты** (`@WebMvcTest`):
-- Проверка HTTP статусов (200, 201, 400, 401, 403, 404, 409, 422)
-- Валидация request body
-- Аутентификация и авторизация
-- Маппинг response
+| Слой | Классы | Подход | Что проверяется |
+|------|--------|--------|-----------------|
+| **Controller** | `AuthController`, `CardController`, `TransferController`, `UserController` | `@WebMvcTest` + MockMvc | HTTP статусы, валидация request body, авторизация по ролям, маппинг response |
+| **Service** | `AuthServiceImpl`, `CardServiceImpl`, `TransferServiceImpl`, `UserServiceImpl`, `KafkaProducerServiceImpl` | Unit + Mockito | Бизнес-логика, обработка исключений, взаимодействие с репозиториями |
+| **Security** | `JwtProvider`, `JwtAuthenticationFilter`, `CustomUserDetailService` | Unit (реальный JWT / Mockito) | Генерация и валидация токенов, фильтрация запросов, обработка expired/blacklisted токенов |
+| **Redis** | `RedisTokenServiceImpl` | Unit + Mockito | Хранение refresh-токенов, blacklist access-токенов, TTL |
+| **Util** | `EncryptionUtil`, `CardMaskingUtil`, `KeyGeneratorUtil` | Unit | AES-256-GCM шифрование/дешифрование, маскирование номеров карт, генерация ключей |
 
-**Service тесты** (Unit с Mockito):
-- Бизнес-логика
-- Обработка исключений
-- Взаимодействие с репозиториями и Redis
+Все тесты — чистые unit-тесты, не требуют запущенных PostgreSQL, Redis или Kafka.
 
 ## Связанные проекты
 

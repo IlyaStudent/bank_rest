@@ -13,6 +13,10 @@ public class KeyGeneratorUtil {
 
     private KeyGeneratorUtil() {}
 
+    public static void main(String[] args) {
+        System.out.println(generateKey());
+    }
+
     public static String generateKey() {
         try {
             KeyGenerator keyGen = KeyGenerator.getInstance(ALGORITHM);
