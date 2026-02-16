@@ -2,7 +2,11 @@ package com.example.bankcards.util;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -13,99 +17,39 @@ class CardMaskingUtilTest {
     @DisplayName("maskCardNumber")
     class MaskCardNumber {
 
-        @Test
-        @DisplayName("Should return masked number with last four digits visible for valid card number")
-        void shouldReturnMasked_whenValidNumber() {
-            String cardNumber = "1111222233334444";
-            String expected = "**** **** **** 4444";
-
-            String result = CardMaskingUtil.maskCardNumber(cardNumber);
-
+        @ParameterizedTest(name = "input: \"{0}\" -> expected: \"{1}\"")
+        @MethodSource("com.example.bankcards.util.CardMaskingUtilTest#validInputs")
+        @DisplayName("Should return masked card number with visible last 4 numbers when valid input")
+        void shouldReturnMaskedWhenValidInput(String input, String expected) {
+            String result = CardMaskingUtil.maskCardNumber(input);
             assertThat(result).isEqualTo(expected);
         }
 
-        @Test
-        @DisplayName("Should ignore spaces in input and mask correctly")
-        void shouldIgnoreSpaces() {
-            String cardNumber = "1111 2222 3333 4444";
-            String expected = "**** **** **** 4444";
-
-            String result = CardMaskingUtil.maskCardNumber(cardNumber);
-
-            assertThat(result).isEqualTo(expected);
-        }
-
-        @Test
-        @DisplayName("Should handle card number with exactly four digits")
-        void shouldHandleExactlyFourDigits() {
-            String cardNumber = "1111";
-            String expected = "**** **** **** 1111";
-
-            String result = CardMaskingUtil.maskCardNumber(cardNumber);
-
-            assertThat(result).isEqualTo(expected);
-        }
-
-        @Test
-        @DisplayName("Should handle card number with leading/trailing spaces and multiple spaces")
-        void shouldHandleNumberWithMultipleSpaces() {
-            String cardNumber = "   1111 2222 3333 44 44   ";
-            String expected = "**** **** **** 4444";
-
-            String result = CardMaskingUtil.maskCardNumber(cardNumber);
-
-            assertThat(result).isEqualTo(expected);
-        }
-
-        @Test
-        @DisplayName("Should return four stars when input is null")
-        void shouldReturnFourStars_whenInputIsNull() {
-            String cardNumber = null;
-
-            String result = CardMaskingUtil.maskCardNumber(cardNumber);
-
+        @ParameterizedTest(name = "input: \"{0}\" -> expected: \"****\"")
+        @MethodSource("com.example.bankcards.util.CardMaskingUtilTest#invalidInputs")
+        @DisplayName("Should return four stars when invalid input")
+        void shouldReturnFourStarsWhenInvalidInput(String input) {
+            String result = CardMaskingUtil.maskCardNumber(input);
             assertThat(result).isEqualTo("****");
         }
+    }
 
-        @Test
-        @DisplayName("Should return four stars when input is empty")
-        void shouldReturnFourStars_whenInputIsEmpty() {
-            String cardNumber = "";
+    static Stream<Arguments> validInputs() {
+        return Stream.of(
+                Arguments.of("1111222233334444", "**** **** **** 4444"),
+                Arguments.of("1111 2222 3333 4444", "**** **** **** 4444"),
+                Arguments.of("1111", "**** **** **** 1111"),
+                Arguments.of("   1111 2222 3333 44 44   ", "**** **** **** 4444"),
+                Arguments.of("abcd efgh 3333", "**** **** **** 3333")
+        );
+    }
 
-            String result = CardMaskingUtil.maskCardNumber(cardNumber);
-
-            assertThat(result).isEqualTo("****");
-        }
-
-        @Test
-        @DisplayName("Should return four stars when input contains only spaces")
-        void shouldReturnFourStars_whenInputContainsOnlySpaces() {
-            String cardNumber = "   ";
-
-            String result = CardMaskingUtil.maskCardNumber(cardNumber);
-
-            assertThat(result).isEqualTo("****");
-        }
-
-        @Test
-        @DisplayName("Should return four stars when input has less than four digits after removing spaces")
-        void shouldReturnFourStars_whenLessThanFourDigits() {
-            String cardNumber = "11 1";
-
-            String result = CardMaskingUtil.maskCardNumber(cardNumber);
-
-            assertThat(result).isEqualTo("****");
-        }
-
-        @Test
-        @DisplayName("Should not remove non‑digit characters (only spaces are removed)")
-        void shouldNotRemoveNonDigitCharacters() {
-            String cardNumber = "abcd efgh 3333";
-            String expected = "**** **** **** 3333";
-
-            String result = CardMaskingUtil.maskCardNumber(cardNumber);
-
-            assertThat(result).isEqualTo(expected);
-        }
+    static Stream<Arguments> invalidInputs() {
+        return Stream.of(
+                Arguments.of((Object) null),
+                Arguments.of(""),
+                Arguments.of("   "),
+                Arguments.of("11 1")
+        );
     }
 }
