@@ -139,7 +139,7 @@ public class UserServiceImpl implements UserService {
             return;
         }
 
-        Boolean userExists = userRepository.existsByUsername(newUsername);
+        boolean userExists = userRepository.existsByUsername(newUsername);
         if (userExists) {
             throw ResourceExistsException.username(newUsername);
         }
@@ -150,7 +150,7 @@ public class UserServiceImpl implements UserService {
             return;
         }
 
-        Boolean userExists = userRepository.existsByEmail(newEmail);
+        boolean userExists = userRepository.existsByEmail(newEmail);
         if (userExists) {
             throw ResourceExistsException.email(newEmail);
         }
