@@ -12,7 +12,7 @@ servers:
 
 tags:
   - name: Authentication
-    description: Регистрация и авторизация
+    description: Регистрация, авторизация, обновление токена и выход
   - name: Cards
     description: Управление банковскими картами
   - name: Transfers
@@ -71,6 +71,61 @@ paths:
                 $ref: '#/components/schemas/AuthResponse'
         '401':
           description: Неверные учетные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/refresh:
+    post:
+      tags: [Authentication]
+      summary: Обновление access-токена
+      description: Обновляет access-токен по refresh-токену и возвращает новую пару токенов
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: Токен успешно обновлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Невалидный или истекший refresh-токен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Выход из системы
+      description: Инвалидирует сессию пользователя (refresh-токен и опционально access-токен)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: Authorization
+          in: header
+          required: false
+          schema:
+            type: string
+          description: "Bearer access-токен (опционально, для инвалидации)"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '204':
+          description: Успешный выход
+        '401':
+          description: Не авторизован
           content:
             application/json:
               schema:
@@ -297,6 +352,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '409':
           description: Пользователь или email уже существует
+        '422':
+          description: Некорректная роль
 
   /api/users/{id}:
     get:
@@ -494,15 +551,23 @@ components:
           format: password
           example: secret123
 
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
     AuthResponse:
       type: object
       properties:
-        token:
+        accessToken:
           type: string
           example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-        type:
+        refreshToken:
           type: string
-          default: Bearer
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
         expiresIn:
           type: string
           format: date-time
@@ -631,6 +696,7 @@ components:
           example: john@example.com
         roles:
           type: array
+          uniqueItems: true
           items:
             type: string
           example: [USER]
@@ -653,6 +719,7 @@ components:
           example: secret123
         roles:
           type: array
+          uniqueItems: true
           items:
             type: string
           example: [USER]
@@ -673,6 +740,7 @@ components:
           minLength: 6
         roles:
           type: array
+          uniqueItems: true
           items:
             type: string
           example: [USER, ADMIN]
