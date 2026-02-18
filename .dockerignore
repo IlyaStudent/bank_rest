@@ -1,0 +1,41 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# Build output
+target/
+build/
+out/
+
+# Docker & K8s
+Dockerfile
+docker-compose*.yml
+k8s/
+.devcontainer/
+
+# Docs
+*.md
+LICENSE
+
+# CI/CD
+Jenkinsfile
+.github/
+
+# Environment
+.env
+.env.*
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
