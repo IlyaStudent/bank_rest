@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: bank-rest
+  labels:
+    app.kubernetes.io/part-of: bank-rest
+    environment: development
