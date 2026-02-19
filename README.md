@@ -73,7 +73,61 @@ cd ../bank_notification_service
 | **Messaging** | Apache Kafka, Spring Kafka                |
 | **Docs** | Swagger/OpenAPI                           |
 | **Testing** | JUnit 5, Mockito, Spring Security Test    |
-| **Infrastructure** | Docker Compose                            |
+| **Infrastructure** | Docker, Kubernetes, Jenkins CI/CD         |
+
+## CI/CD и инфраструктура
+
+### Docker
+
+Приложение упаковано в оптимизированный Docker-образ с multi-stage сборкой:
+
+- **Build stage** — Eclipse Temurin JDK 21 Alpine, сборка Maven с кэшированием зависимостей
+- **Runtime stage** — Eclipse Temurin JRE 21 Alpine (~382MB)
+- Встроенный healthcheck
+
+### Kubernetes
+
+Весь стек описан декларативно в YAML-манифестах (`k8s/`):
+
+| Компонент | Тип | Описание |
+|-----------|-----|----------|
+| **bank-rest-app** | Deployment + NodePort (30080) | Основное приложение |
+| **PostgreSQL** | Deployment + ClusterIP | База данных |
+| **Redis** | Deployment + ClusterIP | Хранение токенов, blacklist |
+| **Kafka + Zookeeper** | Deployment + ClusterIP | Брокер сообщений |
+| **Secrets** | Secret | Пароль БД, ключ шифрования, JWT-секрет |
+| **ConfigMap** | ConfigMap | URL базы данных, адреса Redis и Kafka, TTL токенов |
+
+### Jenkins CI/CD Pipeline
+
+Автоматический пайплайн из 5 этапов:
+
+```
+Checkout → Build & Test (224 теста) → Docker Build → Deploy to K8s → Verify (Health Check)
+```
+
+- **Секреты** хранятся в Jenkins Credentials
+- **Тесты** — JUnit-отчёты публикуются в Jenkins
+- **Деплой** — автоматическое создание K8s-секретов, применение манифестов, rollout restart
+- **Верификация** — health check с повторными попытками до подтверждения работоспособности
+
+### Codespaces Dev Environment
+
+Проект настроен для запуска в GitHub Codespaces с полным окружением:
+
+```bash
+# Автоматически при создании Codespace (postCreateCommand):
+.devcontainer/setup.sh   # Поднимает Minikube + Jenkins
+
+# Ручной деплой (альтернатива Jenkins):
+bash k8s/deploy.sh
+```
+
+| Сервис | URL |
+|--------|-----|
+| Приложение | `http://<minikube-ip>:30080` |
+| Swagger UI | `http://<minikube-ip>:30080/swagger-ui.html` |
+| Jenkins | `http://localhost:8888` |
 
 ## Структура проекта
 
@@ -95,7 +149,23 @@ bank_rest/
 ├── src/main/resources/
 │   ├── application.yml
 │   └── db/migration/    # Liquibase миграции
-├── docker-compose.yml   # PostgreSQL + Kafka + Zookeeper + Redis
+├── k8s/                 # Kubernetes манифесты
+│   ├── namespaces.yml
+│   ├── configmap.yml
+│   ├── secrets.yml.example
+│   ├── postgres.yml
+│   ├── redis.yml
+│   ├── zookeeper.yml
+│   ├── kafka.yml
+│   ├── app.yml
+│   ├── deploy.sh        # Скрипт ручного деплоя
+│   └── destroy.sh       # Скрипт удаления ресурсов
+├── .devcontainer/       # Codespaces конфигурация
+│   ├── devcontainer.json
+│   └── setup.sh         # Minikube + Jenkins setup
+├── Dockerfile           # Multi-stage Docker сборка
+├── Jenkinsfile          # CI/CD pipeline
+├── docker-compose.yml   # Локальный запуск (PostgreSQL + Kafka + Redis)
 └── pom.xml
 ```
 
