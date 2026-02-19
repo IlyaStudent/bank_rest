@@ -6,6 +6,10 @@ pipeline {
         NAMESPACE = 'bank-rest'
     }
 
+    triggers {
+        pollSCM('H/2 * * * *')
+    }
+
     options {
         timeout(time: 30, unit: 'MINUTES')
         timestamps()
