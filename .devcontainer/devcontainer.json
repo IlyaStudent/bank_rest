@@ -1,0 +1,51 @@
+{
+  "name": "Bank REST — K8s Dev Environment",
+  "image": "mcr.microsoft.com/devcontainers/java:21-bullseye",
+
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest",
+      "moby": true
+    },
+    "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
+      "version": "latest",
+      "minikube": "latest",
+      "helm": "none"
+    }
+  },
+
+  "forwardPorts": [8080, 8888, 30080],
+  "portsAttributes": {
+    "8080": { "label": "Spring Boot (direct)", "onAutoForward": "notify" },
+    "8888": { "label": "Jenkins UI", "onAutoForward": "openBrowser" },
+    "30080": { "label": "K8s NodePort (App)", "onAutoForward": "notify" }
+  },
+
+  "postCreateCommand": "chmod +x .devcontainer/setup.sh && .devcontainer/setup.sh",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "vscjava.vscode-java-pack",
+        "ms-kubernetes-tools.vscode-kubernetes-tools",
+        "ms-azuretools.vscode-docker",
+        "redhat.vscode-yaml"
+      ],
+      "settings": {
+        "java.configuration.runtimes": [
+          {
+            "name": "JavaSE-21",
+            "path": "/usr/lib/jvm/msopenjdk-current",
+            "default": true
+          }
+        ]
+      }
+    }
+  },
+
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "16gb",
+    "storage": "32gb"
+  }
+}
