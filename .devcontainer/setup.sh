@@ -6,7 +6,7 @@ echo "  Bank REST — Codespaces Setup"
 echo "=========================================="
 
 echo ""
-echo "[1/4] Starting Minikube..."
+echo "[1/5] Starting Minikube..."
 minikube start \
     --driver=docker \
     --cpus=2 \
@@ -17,37 +17,53 @@ minikube start \
 echo "Minikube status:"
 minikube status
 
+MINIKUBE_IP=$(minikube ip)
+echo "Minikube IP: ${MINIKUBE_IP}"
+
 echo ""
-echo "[2/4] Configuring Docker environment..."
+echo "[2/5] Configuring Docker environment..."
 eval $(minikube docker-env)
 echo "Docker is now pointing to Minikube's Docker daemon."
 
 echo ""
-echo "[3/4] Starting Jenkins..."
+echo "[3/5] Starting Jenkins..."
 
-# Создаём volume для сохранения данных Jenkins
+# Create volume for Jenkins data
 docker volume create jenkins-data 2>/dev/null || true
 
-# Останавливаем старый контейнер, если есть
+# Stop old container if exists
 docker rm -f jenkins 2>/dev/null || true
 
-# Запускаем Jenkins
+# Start Jenkins on minikube network so it can reach Minikube's Docker daemon and K8s API
 docker run -d \
     --name jenkins \
     --restart=unless-stopped \
+    --network=minikube \
     -p 8888:8080 \
     -p 50000:50000 \
     -v jenkins-data:/var/jenkins_home \
-    -v /var/run/docker.sock:/var/run/docker.sock \
-    -v $(which kubectl):/usr/local/bin/kubectl \
-    -v $HOME/.kube:/var/jenkins_home/.kube:ro \
+    -v "$(which kubectl)":/usr/local/bin/kubectl \
+    -v "$HOME/.kube":/var/jenkins_home/.kube:ro \
+    -v "$HOME/.minikube":"$HOME/.minikube":ro \
+    -e DOCKER_HOST="tcp://${MINIKUBE_IP}:2376" \
+    -e DOCKER_TLS_VERIFY="1" \
+    -e DOCKER_CERT_PATH="$HOME/.minikube/certs" \
     -e JAVA_OPTS="-Xmx512m" \
     jenkins/jenkins:lts-jdk21
 
-echo "Jenkins is starting on port 8888..."
-echo "Waiting for Jenkins to be ready..."
+echo ""
+echo "[4/5] Installing Docker CLI in Jenkins..."
+sleep 5
 
-# Ждём, пока Jenkins стартует
+# Install Docker CLI (static binary) into the Jenkins container
+docker exec -u root jenkins sh -c "\
+    curl -fsSL https://download.docker.com/linux/static/stable/\$(uname -m)/docker-25.0.3.tgz \
+    | tar xz --strip-components=1 -C /usr/local/bin docker/docker \
+    && docker version --format 'Docker CLI {{.Client.Version}} installed'"
+
+echo ""
+echo "[5/5] Waiting for Jenkins..."
+
 MAX_WAIT=120
 ELAPSED=0
 while [ $ELAPSED -lt $MAX_WAIT ]; do
@@ -66,7 +82,7 @@ else
 fi
 
 echo ""
-echo "[4/4] Jenkins setup info:"
+echo "Jenkins setup info:"
 echo ""
 echo "  Jenkins URL: http://localhost:8888"
 echo ""
@@ -81,7 +97,7 @@ echo "=========================================="
 echo ""
 echo "  Minikube:  Running (2 CPU, 4GB RAM)"
 echo "  Jenkins:   http://localhost:8888"
-echo "  App:       http://$(minikube ip):30080 (after deployment)"
+echo "  App:       http://${MINIKUBE_IP}:30080 (after deployment)"
 echo ""
 echo "  Next steps:"
 echo "    1. Open Jenkins UI and complete initial setup"
