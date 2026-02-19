@@ -4,7 +4,6 @@ pipeline {
     environment {
         APP_IMAGE = 'bank-rest:latest'
         NAMESPACE = 'bank-rest'
-        JAVA_HOME = tool('jdk-21')
     }
 
     options {
@@ -112,21 +111,27 @@ pipeline {
 
     post {
         success {
-            echo "Pipeline completed successfully"
-            sh 'MINIKUBE_IP=$(minikube ip) && echo "App URL: http://${MINIKUBE_IP}:30080"'
+            node('') {
+                echo "Pipeline completed successfully"
+                sh 'MINIKUBE_IP=$(minikube ip) && echo "App URL: http://${MINIKUBE_IP}:30080"'
+            }
         }
         failure {
-            echo "Pipeline FAILED"
-            sh '''
-                echo "=== Failed Pod Logs ==="
-                kubectl logs -l app=bank-rest-app -n ${NAMESPACE} --tail=100 || true
-                echo ""
-                echo "=== Pod Events ==="
-                kubectl describe pods -l app=bank-rest-app -n ${NAMESPACE} || true
-            '''
+            node('') {
+                echo "Pipeline FAILED"
+                sh '''
+                    echo "=== Failed Pod Logs ==="
+                    kubectl logs -l app=bank-rest-app -n ${NAMESPACE} --tail=100 || true
+                    echo ""
+                    echo "=== Pod Events ==="
+                    kubectl describe pods -l app=bank-rest-app -n ${NAMESPACE} || true
+                '''
+            }
         }
         always {
-            cleanWs()
+            node('') {
+                cleanWs()
+            }
         }
     }
 }
