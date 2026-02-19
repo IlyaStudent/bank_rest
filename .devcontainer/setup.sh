@@ -21,12 +21,7 @@ MINIKUBE_IP=$(minikube ip)
 echo "Minikube IP: ${MINIKUBE_IP}"
 
 echo ""
-echo "[2/5] Configuring Docker environment..."
-eval $(minikube docker-env)
-echo "Docker is now pointing to Minikube's Docker daemon."
-
-echo ""
-echo "[3/5] Starting Jenkins..."
+echo "[2/5] Starting Jenkins..."
 
 # Create volume for Jenkins data
 docker volume create jenkins-data 2>/dev/null || true
@@ -52,7 +47,7 @@ docker run -d \
     jenkins/jenkins:lts-jdk21
 
 echo ""
-echo "[4/5] Installing Docker CLI in Jenkins..."
+echo "[3/5] Installing Docker CLI in Jenkins..."
 sleep 5
 
 # Install Docker CLI (static binary) into the Jenkins container
@@ -62,7 +57,7 @@ docker exec -u root jenkins sh -c "\
     && docker version --format 'Docker CLI {{.Client.Version}} installed'"
 
 echo ""
-echo "[5/5] Waiting for Jenkins..."
+echo "[4/5] Waiting for Jenkins..."
 
 MAX_WAIT=120
 ELAPSED=0
