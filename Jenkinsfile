@@ -48,24 +48,37 @@ pipeline {
 
         stage('Deploy to k8s') {
             steps {
-                sh '''
-                    echo "Applying Kubernetes manifests..."
+                withCredentials([
+                    string(credentialsId: 'bank-rest-db-password', variable: 'DB_PASSWORD'),
+                    string(credentialsId: 'bank-rest-encryption-key', variable: 'ENCRYPTION_KEY'),
+                    string(credentialsId: 'bank-rest-jwt-secret', variable: 'JWT_SECRET')
+                ]) {
+                    sh '''
+                        echo "Applying Kubernetes manifests..."
 
-                    kubectl apply -f k8s/namespaces.yml
-                    kubectl apply -f k8s/secrets.yml
-                    kubectl apply -f k8s/configmap.yml
-                    kubectl apply -f k8s/postgres.yml
-                    kubectl apply -f k8s/redis.yml
-                    kubectl apply -f k8s/zookeeper.yml
-                    kubectl apply -f k8s/kafka.yml
-                    kubectl apply -f k8s/app.yml
+                        kubectl apply -f k8s/namespaces.yml
 
-                    echo "Restarting app deployment..."
-                    kubectl rollout restart deployment/bank-rest-app -n ${NAMESPACE}
+                        kubectl create secret generic bank-rest-secrets \
+                            --namespace=${NAMESPACE} \
+                            --from-literal=DATABASE_PASSWORD="${DB_PASSWORD}" \
+                            --from-literal=ENCRYPTION_KEY="${ENCRYPTION_KEY}" \
+                            --from-literal=JWT_SECRET="${JWT_SECRET}" \
+                            --dry-run=client -o yaml | kubectl apply -f -
 
-                    echo "Waiting for rollout to complete..."
-                    kubectl rollout status deployment/bank-rest-app -n ${NAMESPACE} --timeout=300s
-                '''
+                        kubectl apply -f k8s/configmap.yml
+                        kubectl apply -f k8s/postgres.yml
+                        kubectl apply -f k8s/redis.yml
+                        kubectl apply -f k8s/zookeeper.yml
+                        kubectl apply -f k8s/kafka.yml
+                        kubectl apply -f k8s/app.yml
+
+                        echo "Restarting app deployment..."
+                        kubectl rollout restart deployment/bank-rest-app -n ${NAMESPACE}
+
+                        echo "Waiting for rollout to complete..."
+                        kubectl rollout status deployment/bank-rest-app -n ${NAMESPACE} --timeout=300s
+                    '''
+                }
             }
         }
 
