@@ -38,23 +38,20 @@ pipeline {
 
         stage('Docker build') {
             steps {
-                script {
-                    sh '''
-                        eval $(minikube docker-env)
-                        docker build -t ${APP_IMAGE} .
-                        echo "Docker image built: ${APP_IMAGE}"
-                        docker images | grep bank-rest
-                    '''
-                }
+                sh '''
+                    docker build -t ${APP_IMAGE} .
+                    echo "Docker image built: ${APP_IMAGE}"
+                    docker images | grep bank-rest
+                '''
             }
         }
 
         stage('Deploy to k8s') {
             steps {
                 sh '''
-                echo "Applying Kubernetes manifests..."
+                    echo "Applying Kubernetes manifests..."
 
-                    kubectl apply -f k8s/namespace.yml
+                    kubectl apply -f k8s/namespaces.yml
                     kubectl apply -f k8s/secrets.yml
                     kubectl apply -f k8s/configmap.yml
                     kubectl apply -f k8s/postgres.yml
@@ -84,15 +81,16 @@ pipeline {
 
                     echo ""
                     echo "=== Health Check ==="
-                    MINIKUBE_IP=$(minikube ip)
+                    NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+                    echo "Node IP: ${NODE_IP}"
                     MAX_RETRIES=10
                     RETRY_COUNT=0
 
                     while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-                        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://${MINIKUBE_IP}:30080/actuator/health || true)
+                        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://${NODE_IP}:30080/actuator/health || true)
                         if [ "$HTTP_CODE" = "200" ]; then
                             echo "Health check PASSED (HTTP 200)"
-                            curl -s http://${MINIKUBE_IP}:30080/actuator/health | head -c 500
+                            curl -s http://${NODE_IP}:30080/actuator/health | head -c 500
                             echo ""
                             exit 0
                         fi
@@ -113,7 +111,10 @@ pipeline {
         success {
             node('') {
                 echo "Pipeline completed successfully"
-                sh 'MINIKUBE_IP=$(minikube ip) && echo "App URL: http://${MINIKUBE_IP}:30080"'
+                sh '''
+                    NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+                    echo "App URL: http://${NODE_IP}:30080"
+                '''
             }
         }
         failure {
