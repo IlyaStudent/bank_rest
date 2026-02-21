@@ -1,0 +1,10 @@
+databaseChangeLog:
+  - changeSet:
+      id: fix-users-id-sequence
+      author: developer
+      comment: Reset users_id_seq after manual insert of admin user with id=1
+      changes:
+        - sql:
+            sql: SELECT setval('users_id_seq', (SELECT COALESCE(MAX(id), 0) FROM users));
+      rollback:
+        - empty:
