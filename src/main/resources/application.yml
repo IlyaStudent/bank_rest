@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: optional:file:.env[.properties]
   application:
     name: bank_rest
 
@@ -11,11 +13,11 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: true
+        format_sql: false
 
   liquibase:
     enabled: true
@@ -54,15 +56,14 @@ app:
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
-    enabled: true
   api-docs:
     path: /v3/api-docs
 
 logging:
   level:
-    com.example.bankcards: DEBUG
-    org.springframework.security: DEBUG
-    org.hibernate.SQL: DEBUG
+    com.example.bankcards: INFO
+    org.springframework.security: WARN
+    org.hibernate.SQL: WARN
 
 management:
   endpoints:
