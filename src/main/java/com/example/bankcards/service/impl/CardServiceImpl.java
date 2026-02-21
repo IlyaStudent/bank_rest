@@ -52,8 +52,8 @@ public class CardServiceImpl implements CardService {
 
     @Override
     @Transactional(readOnly = true)
-    public CardResponse getCardById(Long cardId) {
-        return cardMapper.toResponse(findCardById(cardId));
+    public CardResponse getCardById(Long userId, Long cardId) {
+        return cardMapper.toResponse(findCardByOwnerIdAndId(userId, cardId));
     }
 
     @Override
@@ -69,16 +69,16 @@ public class CardServiceImpl implements CardService {
     }
 
     @Override
-    public CardResponse updateCard(Long cardId, CardUpdateRequest cardUpdateRequest) {
-        Card card = findCardById(cardId);
+    public CardResponse updateCard(Long userId, Long cardId, CardUpdateRequest cardUpdateRequest) {
+        Card card = findCardByOwnerIdAndId(userId, cardId);
         return changeCardStatus(card, cardUpdateRequest.getStatus());
     }
 
     @Override
-    public CardResponse blockCard(Long cardId) {
+    public CardResponse blockCard(Long userId, Long cardId) {
         log.debug("Blocking card id={}", cardId);
 
-        Card card = findCardById(cardId);
+        Card card = findCardByOwnerIdAndId(userId, cardId);
         CardResponse response = changeCardStatus(card, CardStatus.BLOCKED.name());
 
         log.info("Card blocked: id={}", cardId);
@@ -87,7 +87,7 @@ public class CardServiceImpl implements CardService {
     }
 
     @Override
-    public void deleteCard(Long cardId) {
+    public void deleteCard(Long userId, Long cardId) {
         log.debug("Deleting card id={}", cardId);
 
         if (!cardRepository.existsById(cardId)) {
@@ -100,8 +100,8 @@ public class CardServiceImpl implements CardService {
 
     // --- Lookup --- //
 
-    private Card findCardById(Long cardId) {
-        return cardRepository.findById(cardId)
+    private Card findCardByOwnerIdAndId(Long userId, Long cardId) {
+        return cardRepository.findByOwnerIdAndId(userId, cardId)
                 .orElseThrow(() -> ResourceNotFoundException.card(cardId));
     }
 

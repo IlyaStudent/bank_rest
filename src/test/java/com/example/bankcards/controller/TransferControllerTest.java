@@ -27,7 +27,6 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
@@ -120,23 +119,22 @@ class TransferControllerTest {
 
         @Test
         @DisplayName("Should create transfer successfully")
-        @WithMockUser(roles = "USER")
         void shouldCreateTransferSuccessfully() throws Exception {
-            when(transferService.transferMoney(any(TransferRequest.class))).thenReturn(transferResponse);
+            when(transferService.transferMoney(any(TransferRequest.class), eq(userId))).thenReturn(transferResponse);
 
             mockMvc.perform(post(TRANSFERS_URL)
+                            .with(user(userDetails))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(transferRequest)))
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.id").value(transferResponseId))
                     .andExpect(jsonPath("$.amount").value(transferAmount.doubleValue()));
 
-            verify(transferService).transferMoney(any(TransferRequest.class));
+            verify(transferService).transferMoney(any(TransferRequest.class), eq(userId));
         }
 
         @Test
         @DisplayName("Should return 400 when validation fails")
-        @WithMockUser(roles = "USER")
         void shouldReturn400WhenValidationFails() throws Exception {
             TransferRequest invalidRequest = TransferRequest.builder()
                     .sourceCardId(1L)
@@ -146,11 +144,12 @@ class TransferControllerTest {
                     .build();
 
             mockMvc.perform(post(TRANSFERS_URL)
+                            .with(user(userDetails))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(invalidRequest)))
                     .andExpect(status().isBadRequest());
 
-            verify(transferService, never()).transferMoney(any());
+            verify(transferService, never()).transferMoney(any(), any());
         }
 
         @Test
@@ -159,27 +158,26 @@ class TransferControllerTest {
             mockMvc.perform(post(TRANSFERS_URL))
                     .andExpect(status().isUnauthorized());
 
-            verify(transferService, never()).transferMoney(any());
+            verify(transferService, never()).transferMoney(any(), any());
         }
 
         @Test
         @DisplayName("Should return 404 when card not found")
-        @WithMockUser(roles = "USER")
         void shouldReturn404WhenCardNotFound() throws Exception {
-            when(transferService.transferMoney(any(TransferRequest.class)))
+            when(transferService.transferMoney(any(TransferRequest.class), eq(userId)))
                     .thenThrow(ResourceNotFoundException.card(destinationCardId));
 
             mockMvc.perform(post(TRANSFERS_URL)
+                            .with(user(userDetails))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(transferRequest)))
                     .andExpect(status().isNotFound());
 
-            verify(transferService).transferMoney(any(TransferRequest.class));
+            verify(transferService).transferMoney(any(TransferRequest.class), eq(userId));
         }
 
         @Test
         @DisplayName("Should return 422 when same card transfer")
-        @WithMockUser(roles = "USER")
         void shouldReturn422WhenSameCardTransfer() throws Exception {
             TransferRequest invalidRequest = TransferRequest.builder()
                     .sourceCardId(1L)
@@ -187,30 +185,46 @@ class TransferControllerTest {
                     .amount(new BigDecimal("100.00"))
                     .description("")
                     .build();
-            when(transferService.transferMoney(any(TransferRequest.class)))
+            when(transferService.transferMoney(any(TransferRequest.class), eq(userId)))
                     .thenThrow(BusinessException.sameCardTransfer());
 
             mockMvc.perform(post(TRANSFERS_URL)
+                            .with(user(userDetails))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(invalidRequest)))
                     .andExpect(status().isUnprocessableEntity());
 
-            verify(transferService).transferMoney(any(TransferRequest.class));
+            verify(transferService).transferMoney(any(TransferRequest.class), eq(userId));
         }
 
         @Test
         @DisplayName("Should return 422 when insufficient funds")
-        @WithMockUser(roles = "USER")
         void shouldReturn422WhenInsufficientFunds() throws Exception {
-            when(transferService.transferMoney(any(TransferRequest.class)))
+            when(transferService.transferMoney(any(TransferRequest.class), eq(userId)))
                     .thenThrow(BusinessException.insufficientFunds(transferRequest.getAmount(), BigDecimal.ZERO));
 
             mockMvc.perform(post(TRANSFERS_URL)
+                            .with(user(userDetails))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(transferRequest)))
                     .andExpect(status().isUnprocessableEntity());
 
-            verify(transferService).transferMoney(any(TransferRequest.class));
+            verify(transferService).transferMoney(any(TransferRequest.class), eq(userId));
+        }
+
+        @Test
+        @DisplayName("Should return 404 when source card not owned by user")
+        void shouldReturn404WhenSourceCardNotOwnedByUser() throws Exception {
+            when(transferService.transferMoney(any(TransferRequest.class), eq(userId)))
+                    .thenThrow(ResourceNotFoundException.card(transferRequest.getSourceCardId()));
+
+            mockMvc.perform(post(TRANSFERS_URL)
+                            .with(user(userDetails))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(transferRequest)))
+                    .andExpect(status().isNotFound());
+
+            verify(transferService).transferMoney(any(TransferRequest.class), eq(userId));
         }
     }
 

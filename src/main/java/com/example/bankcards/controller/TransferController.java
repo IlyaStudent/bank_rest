@@ -32,9 +32,10 @@ public class TransferController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public TransferResponse transferMoney(
-            @RequestBody @Valid TransferRequest transferRequest
+            @RequestBody @Valid TransferRequest transferRequest,
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        return transferService.transferMoney(transferRequest);
+        return transferService.transferMoney(transferRequest, userDetails.getId());
     }
 
     @Operation(summary = "Get transfer history", description = "Returns paginated transfer history for the authenticated user")

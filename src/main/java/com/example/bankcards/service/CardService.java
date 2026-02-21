@@ -11,13 +11,13 @@ import org.springframework.data.domain.Pageable;
 public interface CardService {
     CardResponse createCard(@NotNull CreateCardRequest createCardRequest, @NotNull Long userId);
 
-    CardResponse getCardById(@NotNull Long cardId);
+    CardResponse getCardById(@NotNull Long userId, @NotNull Long cardId);
 
     Page<CardResponse> getCardsForUser(@NotNull Long userId, Pageable pageable);
 
-    CardResponse updateCard(@NotNull Long cardId, @NotNull CardUpdateRequest cardUpdateRequest);
+    CardResponse updateCard(@NotNull Long userId, @NotNull Long cardId, @NotNull CardUpdateRequest cardUpdateRequest);
 
-    CardResponse blockCard(@NotNull Long cardId);
+    CardResponse blockCard(@NotNull Long userId, @NotNull Long cardId);
 
-    void deleteCard(@NotNull Long cardId);
+    void deleteCard(@NotNull Long userId, @NotNull Long cardId);
 }

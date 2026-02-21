@@ -191,31 +191,44 @@ class CardServiceImplTest {
     class GetCardById {
 
         @Test
-        @DisplayName("Should return card when found")
-        void shouldReturnCardWhenFound() {
-            when(cardRepository.findById(cardId)).thenReturn(Optional.of(card));
+        @DisplayName("Should return card when found and owned by user")
+        void shouldReturnCardWhenFoundAndOwnedByUser() {
+            when(cardRepository.findByOwnerIdAndId(userId, cardId)).thenReturn(Optional.of(card));
             when(cardMapper.toResponse(card)).thenReturn(cardResponse);
 
-            CardResponse result = cardService.getCardById(cardId);
+            CardResponse result = cardService.getCardById(userId, cardId);
 
             assertThat(result).isNotNull();
             assertThat(result.getId()).isEqualTo(cardId);
             assertThat(result.getHolderName()).isEqualTo(holderName);
             assertThat(result.getStatus()).isEqualTo(CardStatus.ACTIVE.name());
 
-            verify(cardRepository).findById(cardId);
+            verify(cardRepository).findByOwnerIdAndId(userId, cardId);
             verify(cardMapper).toResponse(card);
         }
 
         @Test
         @DisplayName("Should throw exception when card not found")
         void shouldThrowExceptionWhenCardNotFound() {
-            when(cardRepository.findById(cardId)).thenReturn(Optional.empty());
+            when(cardRepository.findByOwnerIdAndId(userId, cardId)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> cardService.getCardById(cardId))
+            assertThatThrownBy(() -> cardService.getCardById(userId, cardId))
                     .isInstanceOf(ResourceNotFoundException.class);
 
-            verify(cardRepository).findById(cardId);
+            verify(cardRepository).findByOwnerIdAndId(userId, cardId);
+            verify(cardMapper, never()).toResponse(any(Card.class));
+        }
+
+        @Test
+        @DisplayName("Should throw exception when card not owned by user")
+        void shouldThrowExceptionWhenCardNotOwnedByUser() {
+            Long anotherUserId = 999L;
+            when(cardRepository.findByOwnerIdAndId(anotherUserId, cardId)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> cardService.getCardById(anotherUserId, cardId))
+                    .isInstanceOf(ResourceNotFoundException.class);
+
+            verify(cardRepository).findByOwnerIdAndId(anotherUserId, cardId);
             verify(cardMapper, never()).toResponse(any(Card.class));
         }
 
@@ -317,29 +330,29 @@ class CardServiceImplTest {
                     .status(CardStatus.BLOCKED.name())
                     .build();
 
-            when(cardRepository.findById(cardId)).thenReturn(Optional.of(card));
+            when(cardRepository.findByOwnerIdAndId(userId, cardId)).thenReturn(Optional.of(card));
             when(cardRepository.save(card)).thenReturn(card);
             when(cardMapper.toResponse(card)).thenReturn(blockedResponse);
 
-            CardResponse result = cardService.updateCard(cardId, cardUpdateRequest);
+            CardResponse result = cardService.updateCard(userId, cardId, cardUpdateRequest);
 
             assertThat(result).isNotNull();
             assertThat(result.getStatus()).isEqualTo(CardStatus.BLOCKED.name());
             assertThat(card.getStatus()).isEqualTo(CardStatus.BLOCKED);
 
-            verify(cardRepository).findById(cardId);
+            verify(cardRepository).findByOwnerIdAndId(userId, cardId);
             verify(cardRepository).save(card);
         }
 
         @Test
         @DisplayName("Should throw exception when card not found")
         void shouldThrowExceptionWhenCardNotFound() {
-            when(cardRepository.findById(cardId)).thenReturn(Optional.empty());
+            when(cardRepository.findByOwnerIdAndId(userId, cardId)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> cardService.updateCard(cardId, cardUpdateRequest))
+            assertThatThrownBy(() -> cardService.updateCard(userId, cardId, cardUpdateRequest))
                     .isInstanceOf(ResourceNotFoundException.class);
 
-            verify(cardRepository).findById(cardId);
+            verify(cardRepository).findByOwnerIdAndId(userId, cardId);
             verify(cardRepository, never()).save(any(Card.class));
         }
 
@@ -348,12 +361,12 @@ class CardServiceImplTest {
         void shouldThrowExceptionWhenCardStatusInvalid() {
             cardUpdateRequest.setStatus("INVALID_STATUS");
 
-            when(cardRepository.findById(cardId)).thenReturn(Optional.of(card));
+            when(cardRepository.findByOwnerIdAndId(userId, cardId)).thenReturn(Optional.of(card));
 
-            assertThatThrownBy(() -> cardService.updateCard(cardId, cardUpdateRequest))
+            assertThatThrownBy(() -> cardService.updateCard(userId, cardId, cardUpdateRequest))
                     .isInstanceOf(BusinessException.class);
 
-            verify(cardRepository).findById(cardId);
+            verify(cardRepository).findByOwnerIdAndId(userId, cardId);
             verify(cardRepository, never()).save(any(Card.class));
         }
     }
@@ -372,29 +385,29 @@ class CardServiceImplTest {
                     .status(CardStatus.BLOCKED.name())
                     .build();
 
-            when(cardRepository.findById(cardId)).thenReturn(Optional.of(card));
+            when(cardRepository.findByOwnerIdAndId(userId, cardId)).thenReturn(Optional.of(card));
             when(cardRepository.save(card)).thenReturn(card);
             when(cardMapper.toResponse(card)).thenReturn(blockedResponse);
 
-            CardResponse result = cardService.blockCard(cardId);
+            CardResponse result = cardService.blockCard(userId, cardId);
 
             assertThat(result).isNotNull();
             assertThat(result.getStatus()).isEqualTo(CardStatus.BLOCKED.name());
             assertThat(card.getStatus()).isEqualTo(CardStatus.BLOCKED);
 
-            verify(cardRepository).findById(cardId);
+            verify(cardRepository).findByOwnerIdAndId(userId, cardId);
             verify(cardRepository).save(card);
         }
 
         @Test
         @DisplayName("Should throw exception when card not found")
         void shouldThrowExceptionWhenCardNotFound() {
-            when(cardRepository.findById(cardId)).thenReturn(Optional.empty());
+            when(cardRepository.findByOwnerIdAndId(userId, cardId)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> cardService.blockCard(cardId))
+            assertThatThrownBy(() -> cardService.blockCard(userId, cardId))
                     .isInstanceOf(ResourceNotFoundException.class);
 
-            verify(cardRepository).findById(cardId);
+            verify(cardRepository).findByOwnerIdAndId(userId, cardId);
             verify(cardRepository, never()).save(any(Card.class));
         }
 
@@ -409,7 +422,7 @@ class CardServiceImplTest {
         void shouldDeleteCardSuccessfully() {
             when(cardRepository.existsById(cardId)).thenReturn(true);
 
-            cardService.deleteCard(cardId);
+            cardService.deleteCard(userId, cardId);
 
             verify(cardRepository).existsById(cardId);
             verify(cardRepository).deleteById(cardId);
@@ -420,7 +433,7 @@ class CardServiceImplTest {
         void shouldThrowExceptionWhenCardNotFound() {
             when(cardRepository.existsById(cardId)).thenReturn(false);
 
-            assertThatThrownBy(() -> cardService.deleteCard(cardId))
+            assertThatThrownBy(() -> cardService.deleteCard(userId, cardId))
                     .isInstanceOf(ResourceNotFoundException.class);
 
             verify(cardRepository).existsById(cardId);

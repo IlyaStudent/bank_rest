@@ -7,7 +7,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 public interface TransferService {
-    TransferResponse transferMoney(@NotNull TransferRequest transferRequest);
+    TransferResponse transferMoney(@NotNull TransferRequest transferRequest, @NotNull Long userId);
 
     Page<TransferResponse> getTransferHistory(@NotNull Long userId, Pageable pageable);
 }

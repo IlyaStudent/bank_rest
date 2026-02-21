@@ -58,9 +58,11 @@ public class CardController {
     @SuppressWarnings("java:S6856")
     @GetMapping("${end.point.id}")
     public CardResponse getCardById(
-            @Parameter(description = "Card ID") @PathVariable(name = "id") Long cardId
+            @Parameter(description = "Card ID") @PathVariable(name = "id") Long cardId,
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        return cardService.getCardById(cardId);
+        Long userId = userDetails.getId();
+        return cardService.getCardById(userId, cardId);
     }
 
     @Operation(summary = "Update card status", description = "Updates the status of a card (ACTIVE, BLOCKED, EXPIRED)")
@@ -72,9 +74,11 @@ public class CardController {
     @PutMapping("${end.point.id}")
     public CardResponse updateCard(
             @RequestBody @Valid CardUpdateRequest cardUpdateRequest,
-            @Parameter(description = "Card ID") @PathVariable(name = "id") Long cardId
+            @Parameter(description = "Card ID") @PathVariable(name = "id") Long cardId,
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        return cardService.updateCard(cardId, cardUpdateRequest);
+        Long userId = userDetails.getId();
+        return cardService.updateCard(userId, cardId, cardUpdateRequest);
     }
 
     @Operation(summary = "Delete card", description = "Deletes a card by ID (admin only)")
@@ -85,9 +89,11 @@ public class CardController {
     @DeleteMapping("${end.point.id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteCard(
-            @Parameter(description = "Card ID") @PathVariable(name = "id") Long cardId
+            @Parameter(description = "Card ID") @PathVariable(name = "id") Long cardId,
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        cardService.deleteCard(cardId);
+        Long userId = userDetails.getId();
+        cardService.deleteCard(userId, cardId);
     }
 
     @Operation(summary = "Block card", description = "Blocks a card by ID")
@@ -97,8 +103,10 @@ public class CardController {
     @SuppressWarnings("java:S6856")
     @PutMapping("${end.point.block}")
     public CardResponse blockCard(
-            @Parameter(description = "Card ID") @PathVariable(name = "id") Long cardId
+            @Parameter(description = "Card ID") @PathVariable(name = "id") Long cardId,
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        return cardService.blockCard(cardId);
+        Long userId = userDetails.getId();
+        return cardService.blockCard(userId, cardId);
     }
 }

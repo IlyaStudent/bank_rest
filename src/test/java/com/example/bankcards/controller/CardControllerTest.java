@@ -28,7 +28,6 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
@@ -239,17 +238,17 @@ class CardControllerTest {
 
         @Test
         @DisplayName("Should return card successfully")
-        @WithMockUser(roles = "USER")
         void shouldReturnCardSuccessfully() throws Exception {
-            when(cardService.getCardById(cardId)).thenReturn(cardResponse);
+            when(cardService.getCardById(eq(userId), eq(cardId))).thenReturn(cardResponse);
 
-            mockMvc.perform(get(CARD_BY_ID_URL, cardId))
+            mockMvc.perform(get(CARD_BY_ID_URL, cardId)
+                            .with(user(userDetails)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.id").value(cardId))
                     .andExpect(jsonPath("$.holderName").value(holderName))
                     .andExpect(jsonPath("$.maskedCardNumber").value(maskedCardNumber));
 
-            verify(cardService).getCardById(cardId);
+            verify(cardService).getCardById(eq(userId), eq(cardId));
         }
 
         @Test
@@ -258,19 +257,33 @@ class CardControllerTest {
             mockMvc.perform(get(CARD_BY_ID_URL, cardId))
                     .andExpect(status().isUnauthorized());
 
-            verify(cardService, never()).getCardById(any());
+            verify(cardService, never()).getCardById(any(), any());
         }
 
         @Test
         @DisplayName("Should return 404 when card not found")
-        @WithMockUser(roles = "USER")
         void shouldReturn404WhenCardNotFound() throws Exception {
-            when(cardService.getCardById(cardId)).thenThrow(ResourceNotFoundException.card(cardId));
+            when(cardService.getCardById(eq(userId), eq(cardId)))
+                    .thenThrow(ResourceNotFoundException.card(cardId));
 
-            mockMvc.perform(get(CARD_BY_ID_URL, cardId))
+            mockMvc.perform(get(CARD_BY_ID_URL, cardId)
+                            .with(user(userDetails)))
                     .andExpect(status().isNotFound());
 
-            verify(cardService).getCardById(cardId);
+            verify(cardService).getCardById(eq(userId), eq(cardId));
+        }
+
+        @Test
+        @DisplayName("Should return 404 when card not owned by user")
+        void shouldReturn404WhenCardNotOwnedByUser() throws Exception {
+            when(cardService.getCardById(eq(userId), eq(cardId)))
+                    .thenThrow(ResourceNotFoundException.card(cardId));
+
+            mockMvc.perform(get(CARD_BY_ID_URL, cardId)
+                            .with(user(userDetails)))
+                    .andExpect(status().isNotFound());
+
+            verify(cardService).getCardById(eq(userId), eq(cardId));
         }
     }
 
@@ -280,34 +293,34 @@ class CardControllerTest {
 
         @Test
         @DisplayName("Should update card successfully")
-        @WithMockUser(roles = "USER")
         void shouldUpdateCardSuccessfully() throws Exception {
-            when(cardService.updateCard(eq(cardId), any(CardUpdateRequest.class))).thenReturn(cardResponse);
+            when(cardService.updateCard(eq(userId), eq(cardId), any(CardUpdateRequest.class))).thenReturn(cardResponse);
 
             mockMvc.perform(put(CARD_BY_ID_URL, cardId)
+                            .with(user(userDetails))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(cardUpdateRequest)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.id").value(cardId))
                     .andExpect(jsonPath("$.status").value(CardStatus.ACTIVE.name()));
 
-            verify(cardService).updateCard(eq(cardId), any(CardUpdateRequest.class));
+            verify(cardService).updateCard(eq(userId), eq(cardId), any(CardUpdateRequest.class));
         }
 
         @Test
         @DisplayName("Should return 400 when validation fails")
-        @WithMockUser(roles = "USER")
         void shouldReturn400WhenValidationFails() throws Exception {
             CardUpdateRequest invalidRequest = CardUpdateRequest.builder()
                     .status("")
                     .build();
 
             mockMvc.perform(put(CARD_BY_ID_URL, cardId)
+                            .with(user(userDetails))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(invalidRequest)))
                     .andExpect(status().isBadRequest());
 
-            verify(cardService, never()).updateCard(any(), any());
+            verify(cardService, never()).updateCard(any(), any(), any());
         }
 
         @Test
@@ -316,40 +329,40 @@ class CardControllerTest {
             mockMvc.perform(put(CARD_BY_ID_URL, cardId))
                     .andExpect(status().isUnauthorized());
 
-            verify(cardService, never()).updateCard(any(), any());
+            verify(cardService, never()).updateCard(any(), any(), any());
         }
 
         @Test
         @DisplayName("Should return 404 when card not found")
-        @WithMockUser(roles = "USER")
         void shouldReturn404WhenCardNotFound() throws Exception {
-            when(cardService.updateCard(eq(cardId), any(CardUpdateRequest.class)))
+            when(cardService.updateCard(eq(userId), eq(cardId), any(CardUpdateRequest.class)))
                     .thenThrow(ResourceNotFoundException.card(cardId));
 
             mockMvc.perform(put(CARD_BY_ID_URL, cardId)
+                            .with(user(userDetails))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(cardUpdateRequest)))
                     .andExpect(status().isNotFound());
 
-            verify(cardService).updateCard(eq(cardId), any(CardUpdateRequest.class));
+            verify(cardService).updateCard(eq(userId), eq(cardId), any(CardUpdateRequest.class));
         }
 
         @Test
         @DisplayName("Should return 422 when card status invalid")
-        @WithMockUser(roles = "USER")
         void shouldReturn422WhenCardStatusInvalid() throws Exception {
             CardUpdateRequest invalidStatusRequest = CardUpdateRequest.builder()
                     .status("INVALID_STATUS")
                     .build();
-            when(cardService.updateCard(eq(cardId), any(CardUpdateRequest.class)))
+            when(cardService.updateCard(eq(userId), eq(cardId), any(CardUpdateRequest.class)))
                     .thenThrow(BusinessException.invalidCardStatus("INVALID_STATUS"));
 
             mockMvc.perform(put(CARD_BY_ID_URL, cardId)
+                            .with(user(userDetails))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(invalidStatusRequest)))
                     .andExpect(status().isUnprocessableEntity());
 
-            verify(cardService).updateCard(eq(cardId), any(CardUpdateRequest.class));
+            verify(cardService).updateCard(eq(userId), eq(cardId), any(CardUpdateRequest.class));
         }
     }
 
@@ -359,14 +372,14 @@ class CardControllerTest {
 
         @Test
         @DisplayName("Should delete card successfully")
-        @WithMockUser(roles = "USER")
         void shouldDeleteCardSuccessfully() throws Exception {
-            doNothing().when(cardService).deleteCard(cardId);
+            doNothing().when(cardService).deleteCard(eq(userId), eq(cardId));
 
-            mockMvc.perform(delete(CARD_BY_ID_URL, cardId))
+            mockMvc.perform(delete(CARD_BY_ID_URL, cardId)
+                            .with(user(userDetails)))
                     .andExpect(status().isNoContent());
 
-            verify(cardService).deleteCard(cardId);
+            verify(cardService).deleteCard(eq(userId), eq(cardId));
         }
 
         @Test
@@ -375,19 +388,19 @@ class CardControllerTest {
             mockMvc.perform(delete(CARD_BY_ID_URL, cardId))
                     .andExpect(status().isUnauthorized());
 
-            verify(cardService, never()).deleteCard(any());
+            verify(cardService, never()).deleteCard(any(), any());
         }
 
         @Test
         @DisplayName("Should return 404 when card not found")
-        @WithMockUser(roles = "USER")
         void shouldReturn404WhenCardNotFound() throws Exception {
-            doThrow(ResourceNotFoundException.card(cardId)).when(cardService).deleteCard(cardId);
+            doThrow(ResourceNotFoundException.card(cardId)).when(cardService).deleteCard(eq(userId), eq(cardId));
 
-            mockMvc.perform(delete(CARD_BY_ID_URL, cardId))
+            mockMvc.perform(delete(CARD_BY_ID_URL, cardId)
+                            .with(user(userDetails)))
                     .andExpect(status().isNotFound());
 
-            verify(cardService).deleteCard(cardId);
+            verify(cardService).deleteCard(eq(userId), eq(cardId));
         }
     }
 
@@ -397,7 +410,6 @@ class CardControllerTest {
 
         @Test
         @DisplayName("Should block card successfully")
-        @WithMockUser(roles = "USER")
         void shouldBlockCardSuccessfully() throws Exception {
             CardResponse blockedResponse = CardResponse.builder()
                     .id(cardId)
@@ -405,14 +417,15 @@ class CardControllerTest {
                     .holderName(holderName)
                     .status(CardStatus.BLOCKED.name())
                     .build();
-            when(cardService.blockCard(cardId)).thenReturn(blockedResponse);
+            when(cardService.blockCard(eq(userId), eq(cardId))).thenReturn(blockedResponse);
 
-            mockMvc.perform(put(BLOCK_CARD_URL, cardId))
+            mockMvc.perform(put(BLOCK_CARD_URL, cardId)
+                            .with(user(userDetails)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.id").value(cardId))
                     .andExpect(jsonPath("$.status").value(CardStatus.BLOCKED.name()));
 
-            verify(cardService).blockCard(cardId);
+            verify(cardService).blockCard(eq(userId), eq(cardId));
         }
 
         @Test
@@ -421,19 +434,19 @@ class CardControllerTest {
             mockMvc.perform(put(BLOCK_CARD_URL, cardId))
                     .andExpect(status().isUnauthorized());
 
-            verify(cardService, never()).blockCard(any());
+            verify(cardService, never()).blockCard(any(), any());
         }
 
         @Test
         @DisplayName("Should return 404 when card not found")
-        @WithMockUser(roles = "USER")
         void shouldReturn404WhenCardNotFound() throws Exception {
-            when(cardService.blockCard(cardId)).thenThrow(ResourceNotFoundException.card(cardId));
+            when(cardService.blockCard(eq(userId), eq(cardId))).thenThrow(ResourceNotFoundException.card(cardId));
 
-            mockMvc.perform(put(BLOCK_CARD_URL, cardId))
+            mockMvc.perform(put(BLOCK_CARD_URL, cardId)
+                            .with(user(userDetails)))
                     .andExpect(status().isNotFound());
 
-            verify(cardService).blockCard(cardId);
+            verify(cardService).blockCard(eq(userId), eq(cardId));
         }
     }
 }

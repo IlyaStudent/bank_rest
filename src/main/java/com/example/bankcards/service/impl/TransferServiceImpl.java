@@ -15,6 +15,7 @@ import com.example.bankcards.repository.TransferRepository;
 import com.example.bankcards.service.KafkaProducerService;
 import com.example.bankcards.service.TransferService;
 import com.example.bankcards.util.CardMaskingUtil;
+import com.example.bankcards.util.EncryptionUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -33,9 +34,10 @@ public class TransferServiceImpl implements TransferService {
     private final CardRepository cardRepository;
     private final TransferMapper transferMapper;
     private final KafkaProducerService kafkaProducerService;
+    private final EncryptionUtil encryptionUtil;
 
     @Override
-    public TransferResponse transferMoney(TransferRequest transferRequest) {
+    public TransferResponse transferMoney(TransferRequest transferRequest, Long userId) {
         log.debug("Transfer request: sourceCardId={}, destinationCardId={}, amount={}",
                 transferRequest.getSourceCardId(), transferRequest.getDestinationCardId(), transferRequest.getAmount());
 
@@ -44,6 +46,7 @@ public class TransferServiceImpl implements TransferService {
         Card sourceCard = findCardById(transferRequest.getSourceCardId());
         Card destinationCard = findCardById(transferRequest.getDestinationCardId());
 
+        validateCardOwnership(sourceCard, userId);
         validateCardForTransfer(sourceCard);
         validateCardForTransfer(destinationCard);
         validateSufficientFunds(sourceCard, transferRequest.getAmount());
@@ -93,6 +96,12 @@ public class TransferServiceImpl implements TransferService {
         }
     }
 
+    private void validateCardOwnership(Card sourceCard, Long userId) {
+        if (!sourceCard.getOwner().getId().equals(userId)) {
+            throw ResourceNotFoundException.card(sourceCard.getId());
+        }
+    }
+
     // --- Lookup --- //
 
     private Card findCardById(Long cardId) {
@@ -126,8 +135,8 @@ public class TransferServiceImpl implements TransferService {
                 transfer.getId(),
                 sourceCard.getOwner().getId(),
                 destinationCard.getOwner().getId(),
-                CardMaskingUtil.maskCardNumber(sourceCard.getCardNumber()),
-                CardMaskingUtil.maskCardNumber(destinationCard.getCardNumber()),
+                CardMaskingUtil.maskCardNumber(encryptionUtil.decrypt(sourceCard.getCardNumber())),
+                CardMaskingUtil.maskCardNumber(encryptionUtil.decrypt(destinationCard.getCardNumber())),
                 transfer.getAmount(),
                 transfer.getTimestamp(),
                 transfer.getStatus().name()

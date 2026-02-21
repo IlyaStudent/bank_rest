@@ -10,11 +10,13 @@ import com.example.bankcards.mapper.TransferMapper;
 import com.example.bankcards.repository.CardRepository;
 import com.example.bankcards.repository.TransferRepository;
 import com.example.bankcards.service.KafkaProducerService;
+import com.example.bankcards.util.EncryptionUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -49,6 +51,9 @@ class TransferServiceImplTest {
     @Mock
     private KafkaProducerService kafkaProducerService;
 
+    @Mock
+    private EncryptionUtil encryptionUtil;
+
     @InjectMocks
     private TransferServiceImpl transferService;
 
@@ -64,6 +69,8 @@ class TransferServiceImplTest {
     private BigDecimal sourceCardBalance;
     private BigDecimal destinationCardBalance;
     private Pageable pageable;
+    private String encryptedSourceCard;
+    private String encryptedDestCard;
 
     @BeforeEach
     void setUp() {
@@ -73,6 +80,8 @@ class TransferServiceImplTest {
         transferAmount = new BigDecimal("100.00");
         sourceCardBalance = new BigDecimal("500.00");
         destinationCardBalance = new BigDecimal("200.00");
+        encryptedSourceCard = "ENCRYPTED_SOURCE_CARD";
+        encryptedDestCard = "ENCRYPTED_DEST_CARD";
 
         pageable = PageRequest.of(0, 10);
 
@@ -85,7 +94,7 @@ class TransferServiceImplTest {
 
         sourceCard = Card.builder()
                 .id(sourceCardId)
-                .cardNumber("1111 2222 3333 4444")
+                .cardNumber(encryptedSourceCard)
                 .owner(owner)
                 .holderName("IVAN IVANOV")
                 .expiryDate(LocalDate.of(2030, 12, 31))
@@ -95,7 +104,7 @@ class TransferServiceImplTest {
 
         destinationCard = Card.builder()
                 .id(destinationCardId)
-                .cardNumber("5555 6666 7777 8888")
+                .cardNumber(encryptedDestCard)
                 .owner(owner)
                 .holderName("PETR PETROV")
                 .expiryDate(LocalDate.of(2030, 12, 31))
@@ -141,12 +150,21 @@ class TransferServiceImplTest {
             when(cardRepository.findById(destinationCardId)).thenReturn(Optional.of(destinationCard));
             when(transferRepository.save(any(Transfer.class))).thenReturn(transfer);
             when(transferMapper.toResponse(transfer)).thenReturn(transferResponse);
+            when(encryptionUtil.decrypt(encryptedSourceCard)).thenReturn("1111222233334444");
+            when(encryptionUtil.decrypt(encryptedDestCard)).thenReturn("5555666677778888");
 
-            TransferResponse result = transferService.transferMoney(transferRequest);
+            TransferResponse result = transferService.transferMoney(transferRequest, userId);
 
             assertThat(result).isNotNull();
             assertThat(result.getAmount()).isEqualTo(transferAmount);
             assertThat(result.getStatus()).isEqualTo(TransferStatus.SUCCESS.name());
+
+            ArgumentCaptor<TransferEvent> eventCaptor =
+                    ArgumentCaptor.forClass(TransferEvent.class);
+            verify(kafkaProducerService).sendTransferEvent(eventCaptor.capture());
+            TransferEvent event = eventCaptor.getValue();
+            assertThat(event.senderCardMasked()).isEqualTo("**** **** **** 4444");
+            assertThat(event.recipientCardMasked()).isEqualTo("**** **** **** 8888");
 
             assertThat(sourceCard.getBalance()).isEqualTo(sourceCardBalance.subtract(transferAmount));
             assertThat(destinationCard.getBalance()).isEqualTo(destinationCardBalance.add(transferAmount));
@@ -156,6 +174,8 @@ class TransferServiceImplTest {
             verify(transferRepository).save(any(Transfer.class));
             verify(transferMapper).toResponse(transfer);
             verify(kafkaProducerService).sendTransferEvent(any(TransferEvent.class));
+            verify(encryptionUtil).decrypt(encryptedSourceCard);
+            verify(encryptionUtil).decrypt(encryptedDestCard);
         }
 
         @Test
@@ -163,7 +183,7 @@ class TransferServiceImplTest {
         void shouldThrowExceptionWhenTransferAmountIsNotPositive() {
             transferRequest.setAmount(new BigDecimal("-50.00"));
 
-            assertThatThrownBy(() -> transferService.transferMoney(transferRequest))
+            assertThatThrownBy(() -> transferService.transferMoney(transferRequest, userId))
                     .isInstanceOf(BusinessException.class);
 
             verify(cardRepository, never()).findById(any());
@@ -176,7 +196,7 @@ class TransferServiceImplTest {
         void shouldThrowExceptionWhenTransferAmountIsZero() {
             transferRequest.setAmount(BigDecimal.ZERO);
 
-            assertThatThrownBy(() -> transferService.transferMoney(transferRequest))
+            assertThatThrownBy(() -> transferService.transferMoney(transferRequest, userId))
                     .isInstanceOf(BusinessException.class);
 
             verify(cardRepository, never()).findById(any());
@@ -192,7 +212,7 @@ class TransferServiceImplTest {
             when(cardRepository.findById(sourceCardId)).thenReturn(Optional.of(sourceCard));
             when(cardRepository.findById(destinationCardId)).thenReturn(Optional.of(destinationCard));
 
-            assertThatThrownBy(() -> transferService.transferMoney(transferRequest))
+            assertThatThrownBy(() -> transferService.transferMoney(transferRequest, userId))
                     .isInstanceOf(BusinessException.class);
 
             verify(transferRepository, never()).save(any(Transfer.class));
@@ -205,10 +225,24 @@ class TransferServiceImplTest {
             transferRequest.setSourceCardId(sourceCardId);
             transferRequest.setDestinationCardId(sourceCardId);
 
-            assertThatThrownBy(() -> transferService.transferMoney(transferRequest))
+            assertThatThrownBy(() -> transferService.transferMoney(transferRequest, userId))
                     .isInstanceOf(BusinessException.class);
 
             verify(cardRepository, never()).findById(any());
+            verify(transferRepository, never()).save(any(Transfer.class));
+            verify(kafkaProducerService, never()).sendTransferEvent(any());
+        }
+
+        @Test
+        @DisplayName("Should throw exception when source card not owned by user")
+        void shouldThrowExceptionWhenSourceCardNotOwnedByUser() {
+            Long anotherUserId = 2L;
+            when(cardRepository.findById(sourceCardId)).thenReturn(Optional.of(sourceCard));
+            when(cardRepository.findById(destinationCardId)).thenReturn(Optional.of(destinationCard));
+
+            assertThatThrownBy(() -> transferService.transferMoney(transferRequest, anotherUserId))
+                    .isInstanceOf(ResourceNotFoundException.class);
+
             verify(transferRepository, never()).save(any(Transfer.class));
             verify(kafkaProducerService, never()).sendTransferEvent(any());
         }
@@ -218,7 +252,7 @@ class TransferServiceImplTest {
         void shouldThrowExceptionWhenSourceCardNotFound() {
             when(cardRepository.findById(sourceCardId)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> transferService.transferMoney(transferRequest))
+            assertThatThrownBy(() -> transferService.transferMoney(transferRequest, userId))
                     .isInstanceOf(ResourceNotFoundException.class);
 
             verify(cardRepository).findById(sourceCardId);
@@ -232,7 +266,8 @@ class TransferServiceImplTest {
         void shouldThrowExceptionWhenSourceCardBlocked() {
             Card blockedSourceCard = Card.builder()
                     .id(sourceCardId)
-                    .cardNumber("1111 2222 3333 4444")
+                    .cardNumber(encryptedSourceCard)
+                    .owner(User.builder().id(userId).username("test").build())
                     .holderName("IVAN IVANOV")
                     .expiryDate(LocalDate.of(2030, 12, 31))
                     .status(CardStatus.BLOCKED)
@@ -242,7 +277,7 @@ class TransferServiceImplTest {
             when(cardRepository.findById(sourceCardId)).thenReturn(Optional.of(blockedSourceCard));
             when(cardRepository.findById(destinationCardId)).thenReturn(Optional.of(destinationCard));
 
-            assertThatThrownBy(() -> transferService.transferMoney(transferRequest))
+            assertThatThrownBy(() -> transferService.transferMoney(transferRequest, userId))
                     .isInstanceOf(BusinessException.class);
 
             verify(transferRepository, never()).save(any(Transfer.class));
@@ -254,7 +289,8 @@ class TransferServiceImplTest {
         void shouldThrowExceptionWhenSourceCardExpired() {
             Card expiredSourceCard = Card.builder()
                     .id(sourceCardId)
-                    .cardNumber("1111 2222 3333 4444")
+                    .cardNumber(encryptedSourceCard)
+                    .owner(User.builder().id(userId).username("test").build())
                     .holderName("IVAN IVANOV")
                     .expiryDate(LocalDate.of(2030, 12, 31))
                     .status(CardStatus.EXPIRED)
@@ -264,7 +300,7 @@ class TransferServiceImplTest {
             when(cardRepository.findById(sourceCardId)).thenReturn(Optional.of(expiredSourceCard));
             when(cardRepository.findById(destinationCardId)).thenReturn(Optional.of(destinationCard));
 
-            assertThatThrownBy(() -> transferService.transferMoney(transferRequest))
+            assertThatThrownBy(() -> transferService.transferMoney(transferRequest, userId))
                     .isInstanceOf(BusinessException.class);
 
             verify(transferRepository, never()).save(any(Transfer.class));
@@ -277,7 +313,7 @@ class TransferServiceImplTest {
             when(cardRepository.findById(sourceCardId)).thenReturn(Optional.of(sourceCard));
             when(cardRepository.findById(destinationCardId)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> transferService.transferMoney(transferRequest))
+            assertThatThrownBy(() -> transferService.transferMoney(transferRequest, userId))
                     .isInstanceOf(ResourceNotFoundException.class);
 
             verify(cardRepository).findById(sourceCardId);
@@ -291,7 +327,8 @@ class TransferServiceImplTest {
         void shouldThrowExceptionWhenDestinationCardBlocked() {
             Card blockedDestinationCard = Card.builder()
                     .id(destinationCardId)
-                    .cardNumber("5555 6666 7777 8888")
+                    .cardNumber(encryptedDestCard)
+                    .owner(User.builder().id(userId).username("test").build())
                     .holderName("PETR PETROV")
                     .expiryDate(LocalDate.of(2030, 12, 31))
                     .status(CardStatus.BLOCKED)
@@ -301,7 +338,7 @@ class TransferServiceImplTest {
             when(cardRepository.findById(sourceCardId)).thenReturn(Optional.of(sourceCard));
             when(cardRepository.findById(destinationCardId)).thenReturn(Optional.of(blockedDestinationCard));
 
-            assertThatThrownBy(() -> transferService.transferMoney(transferRequest))
+            assertThatThrownBy(() -> transferService.transferMoney(transferRequest, userId))
                     .isInstanceOf(BusinessException.class);
 
             verify(transferRepository, never()).save(any(Transfer.class));
@@ -313,7 +350,8 @@ class TransferServiceImplTest {
         void shouldThrowExceptionWhenDestinationCardExpired() {
             Card expiredDestinationCard = Card.builder()
                     .id(destinationCardId)
-                    .cardNumber("5555 6666 7777 8888")
+                    .cardNumber(encryptedDestCard)
+                    .owner(User.builder().id(userId).username("test").build())
                     .holderName("PETR PETROV")
                     .expiryDate(LocalDate.of(2030, 12, 31))
                     .status(CardStatus.EXPIRED)
@@ -323,7 +361,7 @@ class TransferServiceImplTest {
             when(cardRepository.findById(sourceCardId)).thenReturn(Optional.of(sourceCard));
             when(cardRepository.findById(destinationCardId)).thenReturn(Optional.of(expiredDestinationCard));
 
-            assertThatThrownBy(() -> transferService.transferMoney(transferRequest))
+            assertThatThrownBy(() -> transferService.transferMoney(transferRequest, userId))
                     .isInstanceOf(BusinessException.class);
 
             verify(transferRepository, never()).save(any(Transfer.class));
