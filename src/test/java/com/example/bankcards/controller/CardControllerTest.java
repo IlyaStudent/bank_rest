@@ -239,7 +239,7 @@ class CardControllerTest {
         @Test
         @DisplayName("Should return card successfully")
         void shouldReturnCardSuccessfully() throws Exception {
-            when(cardService.getCardById(eq(userId), eq(cardId))).thenReturn(cardResponse);
+            when(cardService.getCardById(userId, cardId)).thenReturn(cardResponse);
 
             mockMvc.perform(get(CARD_BY_ID_URL, cardId)
                             .with(user(userDetails)))
@@ -248,7 +248,7 @@ class CardControllerTest {
                     .andExpect(jsonPath("$.holderName").value(holderName))
                     .andExpect(jsonPath("$.maskedCardNumber").value(maskedCardNumber));
 
-            verify(cardService).getCardById(eq(userId), eq(cardId));
+            verify(cardService).getCardById(userId, cardId);
         }
 
         @Test
@@ -263,27 +263,28 @@ class CardControllerTest {
         @Test
         @DisplayName("Should return 404 when card not found")
         void shouldReturn404WhenCardNotFound() throws Exception {
-            when(cardService.getCardById(eq(userId), eq(cardId)))
+            when(cardService.getCardById(userId, cardId))
                     .thenThrow(ResourceNotFoundException.card(cardId));
 
             mockMvc.perform(get(CARD_BY_ID_URL, cardId)
                             .with(user(userDetails)))
                     .andExpect(status().isNotFound());
 
-            verify(cardService).getCardById(eq(userId), eq(cardId));
+            verify(cardService).getCardById(userId, cardId);
         }
 
+        @SuppressWarnings("java:S4144")
         @Test
         @DisplayName("Should return 404 when card not owned by user")
         void shouldReturn404WhenCardNotOwnedByUser() throws Exception {
-            when(cardService.getCardById(eq(userId), eq(cardId)))
+            when(cardService.getCardById(userId, cardId))
                     .thenThrow(ResourceNotFoundException.card(cardId));
 
             mockMvc.perform(get(CARD_BY_ID_URL, cardId)
                             .with(user(userDetails)))
                     .andExpect(status().isNotFound());
 
-            verify(cardService).getCardById(eq(userId), eq(cardId));
+            verify(cardService).getCardById(userId, cardId);
         }
     }
 
@@ -373,13 +374,13 @@ class CardControllerTest {
         @Test
         @DisplayName("Should delete card successfully")
         void shouldDeleteCardSuccessfully() throws Exception {
-            doNothing().when(cardService).deleteCard(eq(userId), eq(cardId));
+            doNothing().when(cardService).deleteCard(userId, cardId);
 
             mockMvc.perform(delete(CARD_BY_ID_URL, cardId)
                             .with(user(userDetails)))
                     .andExpect(status().isNoContent());
 
-            verify(cardService).deleteCard(eq(userId), eq(cardId));
+            verify(cardService).deleteCard(userId, cardId);
         }
 
         @Test
@@ -394,13 +395,13 @@ class CardControllerTest {
         @Test
         @DisplayName("Should return 404 when card not found")
         void shouldReturn404WhenCardNotFound() throws Exception {
-            doThrow(ResourceNotFoundException.card(cardId)).when(cardService).deleteCard(eq(userId), eq(cardId));
+            doThrow(ResourceNotFoundException.card(cardId)).when(cardService).deleteCard(userId, cardId);
 
             mockMvc.perform(delete(CARD_BY_ID_URL, cardId)
                             .with(user(userDetails)))
                     .andExpect(status().isNotFound());
 
-            verify(cardService).deleteCard(eq(userId), eq(cardId));
+            verify(cardService).deleteCard(userId, cardId);
         }
     }
 
@@ -417,7 +418,7 @@ class CardControllerTest {
                     .holderName(holderName)
                     .status(CardStatus.BLOCKED.name())
                     .build();
-            when(cardService.blockCard(eq(userId), eq(cardId))).thenReturn(blockedResponse);
+            when(cardService.blockCard(userId, cardId)).thenReturn(blockedResponse);
 
             mockMvc.perform(put(BLOCK_CARD_URL, cardId)
                             .with(user(userDetails)))
@@ -425,7 +426,7 @@ class CardControllerTest {
                     .andExpect(jsonPath("$.id").value(cardId))
                     .andExpect(jsonPath("$.status").value(CardStatus.BLOCKED.name()));
 
-            verify(cardService).blockCard(eq(userId), eq(cardId));
+            verify(cardService).blockCard(userId, cardId);
         }
 
         @Test
@@ -440,13 +441,13 @@ class CardControllerTest {
         @Test
         @DisplayName("Should return 404 when card not found")
         void shouldReturn404WhenCardNotFound() throws Exception {
-            when(cardService.blockCard(eq(userId), eq(cardId))).thenThrow(ResourceNotFoundException.card(cardId));
+            when(cardService.blockCard(userId, cardId)).thenThrow(ResourceNotFoundException.card(cardId));
 
             mockMvc.perform(put(BLOCK_CARD_URL, cardId)
                             .with(user(userDetails)))
                     .andExpect(status().isNotFound());
 
-            verify(cardService).blockCard(eq(userId), eq(cardId));
+            verify(cardService).blockCard(userId, cardId);
         }
     }
 }
