@@ -29,3 +29,19 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+
+app:
+  rate-limit:
+    login:
+      capacity: 5
+      minutes: 1
+    register:
+      capacity: 3
+      minutes: 1
+    transfers:
+      capacity: 10
+      minutes: 1
+    general:
+      capacity: 100
+      minutes: 1
+

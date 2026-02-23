@@ -52,6 +52,19 @@ app:
     secret: ${JWT_SECRET}
     access-expiration: ${ACCESS_TOKEN_EXPIRATION:900000}
     refresh-expiration: ${REFRESH_TOKEN_EXPIRATION:604800000}
+  rate-limit:
+    login:
+      capacity: 5
+      minutes: 1
+    register:
+      capacity: 3
+      minutes: 1
+    transfers:
+      capacity: 10
+      minutes: 1
+    general:
+      capacity: 100
+      minutes: 1
 
 springdoc:
   swagger-ui:

@@ -36,6 +36,9 @@ public enum ApiErrorMessage {
     INVALID_TOKEN_SIGNATURE("Invalid token signature"),
     INVALID_REFRESH_TOKEN("Invalid or expired refresh token"),
 
+    // Too many requests (429)
+    RATE_LIMIT_EXCEEDED("Too many requests. Please, try again later"),
+
     // General errors (500)
     ENCRYPTION_FAILED("Encryption failed"),
     DECRYPTION_FAILED("Decryption failed"),

@@ -9,6 +9,8 @@ import com.example.bankcards.entity.RoleType;
 import com.example.bankcards.exception.ResourceExistsException;
 import com.example.bankcards.exception.ResourceNotFoundException;
 import com.example.bankcards.security.JwtAuthenticationFilter;
+import com.example.bankcards.security.RateLimitFilter;
+import com.example.bankcards.config.RateLimitConfig;
 import com.example.bankcards.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,7 +44,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         controllers = UserController.class,
         excludeFilters = @ComponentScan.Filter(
                 type = FilterType.ASSIGNABLE_TYPE,
-                classes = {SecurityConfig.class, JwtAuthenticationFilter.class}
+                classes = {SecurityConfig.class, JwtAuthenticationFilter.class, RateLimitFilter.class, RateLimitConfig.class}
         )
 )
 @Import(TestSecurityConfig.class)
