@@ -43,8 +43,8 @@ public class TransferServiceImpl implements TransferService {
 
         validateTransferRequest(transferRequest);
 
-        Card sourceCard = findCardById(transferRequest.getSourceCardId());
-        Card destinationCard = findCardById(transferRequest.getDestinationCardId());
+        Card sourceCard = findByIdForUpdate(transferRequest.getSourceCardId());
+        Card destinationCard = findByIdForUpdate(transferRequest.getDestinationCardId());
 
         validateCardOwnership(sourceCard, userId);
         validateCardForTransfer(sourceCard);
@@ -104,8 +104,8 @@ public class TransferServiceImpl implements TransferService {
 
     // --- Lookup --- //
 
-    private Card findCardById(Long cardId) {
-        return cardRepository.findById(cardId)
+    private Card findByIdForUpdate(Long cardId) {
+        return cardRepository.findByIdForUpdate(cardId)
                 .orElseThrow(() -> ResourceNotFoundException.card(cardId));
     }
 
