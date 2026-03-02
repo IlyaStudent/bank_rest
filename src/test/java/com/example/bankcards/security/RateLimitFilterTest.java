@@ -3,6 +3,7 @@ package com.example.bankcards.security;
 import com.example.bankcards.config.RateLimitProperties;
 import com.example.bankcards.util.constants.ApiErrorMessage;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.ConsumptionProbe;
 import io.github.bucket4j.distributed.BucketProxy;
 import io.github.bucket4j.redis.lettuce.cas.LettuceBasedProxyManager;
@@ -13,7 +14,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Answers;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -26,7 +30,6 @@ import java.util.Map;
 import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -92,14 +95,14 @@ class RateLimitFilterTest {
     }
 
     private void setupBucketConsumed(long remaining) {
-        when(proxyManager.builder().build(anyString(), any(Supplier.class))).thenReturn(bucketProxy);
+        when(proxyManager.builder().build(anyString(), ArgumentMatchers.<Supplier<BucketConfiguration>>any())).thenReturn(bucketProxy);
         when(bucketProxy.tryConsumeAndReturnRemaining(1)).thenReturn(consumptionProbe);
         when(consumptionProbe.isConsumed()).thenReturn(true);
         when(consumptionProbe.getRemainingTokens()).thenReturn(remaining);
     }
 
     private void setupBucketRejected(long nanosToRefill) {
-        when(proxyManager.builder().build(anyString(), any(Supplier.class))).thenReturn(bucketProxy);
+        when(proxyManager.builder().build(anyString(), ArgumentMatchers.<Supplier<BucketConfiguration>>any())).thenReturn(bucketProxy);
         when(bucketProxy.tryConsumeAndReturnRemaining(1)).thenReturn(consumptionProbe);
         when(consumptionProbe.isConsumed()).thenReturn(false);
         when(consumptionProbe.getNanosToWaitForRefill()).thenReturn(nanosToRefill);
@@ -109,43 +112,10 @@ class RateLimitFilterTest {
     @DisplayName("Skip paths")
     class SkipPaths {
 
-        @Test
-        @DisplayName("Should pass through for Swagger path")
-        void shouldPassThroughForSwaggerPath() throws ServletException, IOException {
-            request.setRequestURI("/swagger-ui/index.html");
-
-            rateLimitFilter.doFilterInternal(request, response, filterChain);
-
-            verify(filterChain).doFilter(request, response);
-            verify(bucketProxy, never()).tryConsumeAndReturnRemaining(anyLong());
-        }
-
-        @Test
-        @DisplayName("Should pass through for actuator path")
-        void shouldPassThroughForActuatorPath() throws ServletException, IOException {
-            request.setRequestURI("/actuator/health");
-
-            rateLimitFilter.doFilterInternal(request, response, filterChain);
-
-            verify(filterChain).doFilter(request, response);
-            verify(bucketProxy, never()).tryConsumeAndReturnRemaining(anyLong());
-        }
-
-        @Test
-        @DisplayName("Should pass through for API docs path")
-        void shouldPassThroughForApiDocsPath() throws ServletException, IOException {
-            request.setRequestURI("/v3/api-docs");
-
-            rateLimitFilter.doFilterInternal(request, response, filterChain);
-
-            verify(filterChain).doFilter(request, response);
-            verify(bucketProxy, never()).tryConsumeAndReturnRemaining(anyLong());
-        }
-
-        @Test
-        @DisplayName("Should pass through for non-API path")
-        void shouldPassThroughForNonApiPath() throws ServletException, IOException {
-            request.setRequestURI("/some/other/path");
+        @ParameterizedTest(name = "Should pass through for path: {0}")
+        @ValueSource(strings = {"/swagger-ui/index.html", "/actuator/health", "/v3/api-docs", "/some/other/path"})
+        void shouldPassThroughForSkippedPaths(String uri) throws ServletException, IOException {
+            request.setRequestURI(uri);
 
             rateLimitFilter.doFilterInternal(request, response, filterChain);
 
@@ -223,11 +193,11 @@ class RateLimitFilterTest {
             @SuppressWarnings("unchecked")
             Map<String, Object> body = new ObjectMapper().readValue(
                     response.getContentAsString(), Map.class);
-            assertThat(body.get("status")).isEqualTo(429);
-            assertThat(body.get("error")).isEqualTo("Too Many Requests");
-            assertThat(body.get("message")).isEqualTo(
-                    ApiErrorMessage.RATE_LIMIT_EXCEEDED.getMessage());
-            assertThat(body.get("path")).isEqualTo("/api/auth/login");
+            assertThat(body)
+                    .containsEntry("status", 429)
+                    .containsEntry("error", "Too Many Requests")
+                    .containsEntry("message", ApiErrorMessage.RATE_LIMIT_EXCEEDED.getMessage())
+                    .containsEntry("path", "/api/auth/login");
         }
 
         @Test
@@ -312,7 +282,7 @@ class RateLimitFilterTest {
 
         @Test
         @DisplayName("Should use remote address when no X-Forwarded-For")
-        void shouldUseRemoteAddrWhenNoForwardedHeader() throws ServletException, IOException {
+        void shouldUseRemoteAddressWhenNoForwardedHeader() throws ServletException, IOException {
             request.setRequestURI("/api/auth/login");
             request.setMethod("POST");
             request.setRemoteAddr("192.168.1.100");
