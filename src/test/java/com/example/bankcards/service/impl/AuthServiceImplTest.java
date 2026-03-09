@@ -23,7 +23,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -33,6 +32,7 @@ import java.time.Instant;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.Executor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -59,8 +59,8 @@ class AuthServiceImplTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
-    @InjectMocks
     private AuthServiceImpl authService;
+    private final Executor syncExecutor = Runnable::run;
 
     private RegisterRequest registerRequest;
     private LoginRequest loginRequest;
@@ -77,6 +77,10 @@ class AuthServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        authService = new AuthServiceImpl(
+                userRepository, roleRepository, redisTokenService,
+                userMapper, jwtProvider, passwordEncoder, syncExecutor
+        );
         ReflectionTestUtils.setField(authService, "refreshExpiration", 604800000L);
 
         username = "test";
@@ -172,12 +176,13 @@ class AuthServiceImplTest {
         @DisplayName("Should throw exception when username already exists")
         void shouldThrowExceptionWhenUsernameAlreadyExists() {
             when(userRepository.existsByUsername(username)).thenReturn(true);
+            when(userRepository.existsByEmail(email)).thenReturn(false);
 
             assertThatThrownBy(() -> authService.register(registerRequest))
                     .isInstanceOf(ResourceExistsException.class);
 
             verify(userRepository).existsByUsername(username);
-            verify(userRepository, never()).existsByEmail(any());
+            verify(userRepository).existsByEmail(email);
             verify(userRepository, never()).save(any(User.class));
         }
 

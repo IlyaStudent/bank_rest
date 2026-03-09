@@ -19,10 +19,15 @@ import com.example.bankcards.service.AuthService;
 import com.example.bankcards.service.RedisTokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 
 @Slf4j
 @Service
@@ -35,6 +40,8 @@ public class AuthServiceImpl implements AuthService {
     private final UserMapper userMapper;
     private final JwtProvider jwtProvider;
     private final PasswordEncoder passwordEncoder;
+    @Qualifier("ioExecutor")
+    private final Executor ioExecutor;
 
     @Value("${app.jwt.refresh-expiration}")
     private Long refreshExpiration;
@@ -87,10 +94,23 @@ public class AuthServiceImpl implements AuthService {
         if (!request.getPassword().equals(request.getConfirmPassword())) {
             throw BusinessException.passwordsDoNotMatch();
         }
-        if (userRepository.existsByUsername(request.getUsername())) {
+
+        CompletableFuture<Boolean> usernameFuture = CompletableFuture.supplyAsync(
+                () -> userRepository.existsByUsername(request.getUsername()),
+                ioExecutor
+        );
+
+        CompletableFuture<Boolean> emailFuture = CompletableFuture.supplyAsync(
+                () -> userRepository.existsByEmail(request.getEmail()),
+                ioExecutor
+        );
+
+        CompletableFuture.allOf(usernameFuture, emailFuture).join();
+
+        if (usernameFuture.join()) {
             throw ResourceExistsException.username(request.getUsername());
         }
-        if (userRepository.existsByEmail(request.getEmail())) {
+        if (emailFuture.join()) {
             throw ResourceExistsException.email(request.getEmail());
         }
     }
@@ -118,15 +138,32 @@ public class AuthServiceImpl implements AuthService {
                 .orElseThrow(() -> ResourceNotFoundException.role(RoleType.USER));
         user.getRoles().add(userRole);
 
-        return userRepository.save(user);
+        try {
+            return userRepository.save(user);
+        } catch (DataIntegrityViolationException e) {
+            String message = e.getMostSpecificCause().getMessage().toLowerCase();
+            if (message.contains("email")) {
+                throw ResourceExistsException.email(request.getEmail());
+            }
+            throw ResourceExistsException.username(request.getUsername());
+        }
     }
 
     // --- Token management --- //
 
     private AuthResponse buildAuthResponse(User user) {
-        String accessToken = jwtProvider.generateAccessToken(user);
+        CompletableFuture<String> accessFuture = CompletableFuture.supplyAsync(
+                () -> jwtProvider.generateAccessToken(user)
+        );
+
         String refreshToken = jwtProvider.generateRefreshToken();
-        redisTokenService.saveRefreshToken(refreshToken, user.getId(), refreshExpiration);
+
+        CompletableFuture<Void> redisFuture = CompletableFuture.runAsync(
+                () -> redisTokenService.saveRefreshToken(refreshToken, user.getId(), refreshExpiration)
+        );
+
+        String accessToken = accessFuture.join();
+        redisFuture.join();
 
         return AuthResponse.builder()
                 .accessToken(accessToken)

@@ -63,12 +63,12 @@ class KafkaProducerServiceImplTest {
 
     @Test
     @DisplayName("Should send transfer event to Kafka with correct parameters")
-    void shouldSendTransferEventToKafkaWithCorrectParameters() {
+    void shouldSendTransferEventAsyncToKafkaWithCorrectParameters() {
         CompletableFuture<SendResult<String, TransferEvent>> future = new CompletableFuture<>();
         when(kafkaTemplate.send(any(String.class), any(String.class), any(TransferEvent.class)))
                 .thenReturn(future);
 
-        kafkaProducerService.sendTransferEvent(transferEvent);
+        kafkaProducerService.sendTransferEventAsync(transferEvent);
 
         verify(kafkaTemplate).send(topicCaptor.capture(), keyCaptor.capture(), eventCaptor.capture());
 
@@ -84,7 +84,7 @@ class KafkaProducerServiceImplTest {
         when(kafkaTemplate.send(any(String.class), any(String.class), any(TransferEvent.class)))
                 .thenReturn(future);
 
-        kafkaProducerService.sendTransferEvent(transferEvent);
+        kafkaProducerService.sendTransferEventAsync(transferEvent);
 
         verify(kafkaTemplate).send(TOPIC, "1", transferEvent);
     }
@@ -96,7 +96,7 @@ class KafkaProducerServiceImplTest {
         when(kafkaTemplate.send(any(String.class), any(String.class), any(TransferEvent.class)))
                 .thenReturn(future);
 
-        kafkaProducerService.sendTransferEvent(transferEvent);
+        kafkaProducerService.sendTransferEventAsync(transferEvent);
 
         RecordMetadata recordMetadata = new RecordMetadata(
                 new TopicPartition(TOPIC, 0),
@@ -121,7 +121,7 @@ class KafkaProducerServiceImplTest {
         when(kafkaTemplate.send(any(String.class), any(String.class), any(TransferEvent.class)))
                 .thenReturn(future);
 
-        kafkaProducerService.sendTransferEvent(transferEvent);
+        kafkaProducerService.sendTransferEventAsync(transferEvent);
 
         future.completeExceptionally(new RuntimeException("Kafka unavailable"));
 
@@ -135,7 +135,7 @@ class KafkaProducerServiceImplTest {
         when(kafkaTemplate.send(any(String.class), any(String.class), any(TransferEvent.class)))
                 .thenReturn(future);
 
-        kafkaProducerService.sendTransferEvent(transferEvent);
+        kafkaProducerService.sendTransferEventAsync(transferEvent);
 
         verify(kafkaTemplate).send(topicCaptor.capture(), keyCaptor.capture(), eventCaptor.capture());
 

@@ -18,12 +18,16 @@ import com.example.bankcards.util.CardMaskingUtil;
 import com.example.bankcards.util.EncryptionUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.Executor;
 
 @Slf4j
 @Service
@@ -35,6 +39,10 @@ public class TransferServiceImpl implements TransferService {
     private final TransferMapper transferMapper;
     private final KafkaProducerService kafkaProducerService;
     private final EncryptionUtil encryptionUtil;
+    @Qualifier("cryptoExecutor")
+    private final Executor cryptoExecutor;
+    @Qualifier("ioExecutor")
+    private final Executor ioExecutor;
 
     @Override
     public TransferResponse transferMoney(TransferRequest transferRequest, Long userId) {
@@ -43,8 +51,9 @@ public class TransferServiceImpl implements TransferService {
 
         validateTransferRequest(transferRequest);
 
-        Card sourceCard = findByIdForUpdate(transferRequest.getSourceCardId());
-        Card destinationCard = findByIdForUpdate(transferRequest.getDestinationCardId());
+        CardPair cardPair = loadCardPairsAsync(transferRequest.getSourceCardId(), transferRequest.getDestinationCardId());
+        Card sourceCard = cardPair.source;
+        Card destinationCard = cardPair.destination;
 
         validateCardOwnership(sourceCard, userId);
         validateCardForTransfer(sourceCard);
@@ -102,7 +111,28 @@ public class TransferServiceImpl implements TransferService {
         }
     }
 
+    // --- Inner types --- //
+
+    private record CardPair(Card source, Card destination) {
+    }
+
     // --- Lookup --- //
+
+    private CardPair loadCardPairsAsync(Long sourceId, Long destinationId) {
+        try {
+            return CompletableFuture.supplyAsync(() -> findByIdForUpdate(sourceId), ioExecutor)
+                    .thenCombine(
+                            CompletableFuture.supplyAsync(() -> findByIdForUpdate(destinationId), ioExecutor),
+                            CardPair::new
+                    ).join();
+        } catch (CompletionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException re) {
+                throw re;
+            }
+            throw e;
+        }
+    }
 
     private Card findByIdForUpdate(Long cardId) {
         return cardRepository.findByIdForUpdate(cardId)
@@ -131,17 +161,26 @@ public class TransferServiceImpl implements TransferService {
     // --- Events --- //
 
     private void publishTransferEvent(Transfer transfer, Card sourceCard, Card destinationCard) {
+        CompletableFuture<String> senderMasked = CompletableFuture.supplyAsync(
+                () -> CardMaskingUtil.maskCardNumber(encryptionUtil.decrypt(sourceCard.getCardNumber())),
+                cryptoExecutor
+        );
+        CompletableFuture<String> recipientMasked = CompletableFuture.supplyAsync(
+                () -> CardMaskingUtil.maskCardNumber(encryptionUtil.decrypt(destinationCard.getCardNumber())),
+                cryptoExecutor
+        );
+
         TransferEvent event = new TransferEvent(
                 transfer.getId(),
                 sourceCard.getOwner().getId(),
                 destinationCard.getOwner().getId(),
-                CardMaskingUtil.maskCardNumber(encryptionUtil.decrypt(sourceCard.getCardNumber())),
-                CardMaskingUtil.maskCardNumber(encryptionUtil.decrypt(destinationCard.getCardNumber())),
+                senderMasked.join(),
+                recipientMasked.join(),
                 transfer.getAmount(),
                 transfer.getTimestamp(),
                 transfer.getStatus().name()
         );
 
-        kafkaProducerService.sendTransferEvent(event);
+        kafkaProducerService.sendTransferEventAsync(event);
     }
 }

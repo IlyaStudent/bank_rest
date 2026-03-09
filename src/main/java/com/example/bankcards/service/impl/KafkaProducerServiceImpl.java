@@ -5,7 +5,10 @@ import com.example.bankcards.service.KafkaProducerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+
+import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @Service
@@ -16,27 +19,20 @@ public class KafkaProducerServiceImpl implements KafkaProducerService {
 
     private final KafkaTemplate<String, TransferEvent> kafkaTemplate;
 
+    @Async("kafkaExecutor")
     @Override
-    public void sendTransferEvent(TransferEvent event) {
-        log.debug("Sending transfer event to Kafka: transferId={}", event.transferId());
-
-        kafkaTemplate.send(TOPIC, event.transferId().toString(), event)
-                .whenComplete((result, ex) -> {
-                    if (ex == null) {
-                        log.info(
-                                "Transfer event sent to Kafka: transferId={}, partition={}, offset={}",
-                                event.transferId(),
-                                result.getRecordMetadata().partition(),
-                                result.getRecordMetadata().offset()
-                        );
-                    } else {
-                        log.error(
-                                "Failed to send transfer event to Kafka: transferId={}",
-                                event.transferId(),
-                                ex
-                        );
-                    }
-                });
-
+    public CompletableFuture<Void> sendTransferEventAsync(TransferEvent event) {
+        return kafkaTemplate.send(TOPIC, event.transferId().toString(), event)
+                .thenAccept(result -> log.info(
+                        "Transfer event sent: transferId={}, partition={}, offset={}",
+                        event.transferId(),
+                        result.getRecordMetadata().partition(),
+                        result.getRecordMetadata().offset()
+                ))
+                .exceptionally(ex -> {
+                    log.error("Failed to send transfer event: transferId={}", event.transferId(), ex);
+                    return null;
+                })
+                .toCompletableFuture();
     }
 }

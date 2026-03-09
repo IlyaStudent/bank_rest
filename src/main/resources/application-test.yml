@@ -1,0 +1,47 @@
+spring:
+  config:
+    import: ""
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+  liquibase:
+    enabled: true
+    change-log: classpath:db/migration/db.changelog-master.yaml
+
+  kafka:
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+
+app:
+  encryption:
+    key: "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE="
+  jwt:
+    secret: "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyMw=="
+    access-expiration: 900000
+    refresh-expiration: 604800000
+
+  rate-limit:
+    login:
+      capacity: 1000
+      minutes: 1
+    register:
+      capacity: 1000
+      minutes: 1
+    transfers:
+      capacity: 1000
+      minutes: 1
+    general:
+      capacity: 1000
+      minutes: 1
+
+logging:
+  level:
+    com.example.bankcards: WARN
+    org.testcontainers: INFO
+    org.springframework.test: WARN

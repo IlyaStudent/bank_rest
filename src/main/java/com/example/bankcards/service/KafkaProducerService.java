@@ -2,6 +2,8 @@ package com.example.bankcards.service;
 
 import com.example.bankcards.event.TransferEvent;
 
+import java.util.concurrent.CompletableFuture;
+
 public interface KafkaProducerService {
-    void sendTransferEvent(TransferEvent event);
+    CompletableFuture<Void> sendTransferEventAsync(TransferEvent event);
 }

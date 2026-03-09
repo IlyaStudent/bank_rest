@@ -17,7 +17,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
@@ -30,6 +29,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Executor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -54,8 +54,8 @@ class TransferServiceImplTest {
     @Mock
     private EncryptionUtil encryptionUtil;
 
-    @InjectMocks
     private TransferServiceImpl transferService;
+    private final Executor syncExecutor = Runnable::run;
 
     private TransferRequest transferRequest;
     private TransferResponse transferResponse;
@@ -74,6 +74,12 @@ class TransferServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        transferService = new TransferServiceImpl(
+                transferRepository, cardRepository, transferMapper,
+                kafkaProducerService, encryptionUtil,
+                syncExecutor, syncExecutor
+        );
+
         sourceCardId = 1L;
         destinationCardId = 2L;
         userId = 1L;
@@ -161,7 +167,7 @@ class TransferServiceImplTest {
 
             ArgumentCaptor<TransferEvent> eventCaptor =
                     ArgumentCaptor.forClass(TransferEvent.class);
-            verify(kafkaProducerService).sendTransferEvent(eventCaptor.capture());
+            verify(kafkaProducerService).sendTransferEventAsync(eventCaptor.capture());
             TransferEvent event = eventCaptor.getValue();
             assertThat(event.senderCardMasked()).isEqualTo("**** **** **** 4444");
             assertThat(event.recipientCardMasked()).isEqualTo("**** **** **** 8888");
@@ -173,7 +179,7 @@ class TransferServiceImplTest {
             verify(cardRepository).findByIdForUpdate(destinationCardId);
             verify(transferRepository).save(any(Transfer.class));
             verify(transferMapper).toResponse(transfer);
-            verify(kafkaProducerService).sendTransferEvent(any(TransferEvent.class));
+            verify(kafkaProducerService).sendTransferEventAsync(any(TransferEvent.class));
             verify(encryptionUtil).decrypt(encryptedSourceCard);
             verify(encryptionUtil).decrypt(encryptedDestCard);
         }
@@ -188,7 +194,7 @@ class TransferServiceImplTest {
 
             verify(cardRepository, never()).findByIdForUpdate(any());
             verify(transferRepository, never()).save(any(Transfer.class));
-            verify(kafkaProducerService, never()).sendTransferEvent(any());
+            verify(kafkaProducerService, never()).sendTransferEventAsync(any());
         }
 
         @Test
@@ -201,7 +207,7 @@ class TransferServiceImplTest {
 
             verify(cardRepository, never()).findByIdForUpdate(any());
             verify(transferRepository, never()).save(any(Transfer.class));
-            verify(kafkaProducerService, never()).sendTransferEvent(any());
+            verify(kafkaProducerService, never()).sendTransferEventAsync(any());
         }
 
         @Test
@@ -216,7 +222,7 @@ class TransferServiceImplTest {
                     .isInstanceOf(BusinessException.class);
 
             verify(transferRepository, never()).save(any(Transfer.class));
-            verify(kafkaProducerService, never()).sendTransferEvent(any());
+            verify(kafkaProducerService, never()).sendTransferEventAsync(any());
         }
 
         @Test
@@ -230,7 +236,7 @@ class TransferServiceImplTest {
 
             verify(cardRepository, never()).findByIdForUpdate(any());
             verify(transferRepository, never()).save(any(Transfer.class));
-            verify(kafkaProducerService, never()).sendTransferEvent(any());
+            verify(kafkaProducerService, never()).sendTransferEventAsync(any());
         }
 
         @Test
@@ -244,21 +250,22 @@ class TransferServiceImplTest {
                     .isInstanceOf(ResourceNotFoundException.class);
 
             verify(transferRepository, never()).save(any(Transfer.class));
-            verify(kafkaProducerService, never()).sendTransferEvent(any());
+            verify(kafkaProducerService, never()).sendTransferEventAsync(any());
         }
 
         @Test
         @DisplayName("Should throw exception when source card not found")
         void shouldThrowExceptionWhenSourceCardNotFound() {
             when(cardRepository.findByIdForUpdate(sourceCardId)).thenReturn(Optional.empty());
+            when(cardRepository.findByIdForUpdate(destinationCardId)).thenReturn(Optional.of(destinationCard));
 
             assertThatThrownBy(() -> transferService.transferMoney(transferRequest, userId))
                     .isInstanceOf(ResourceNotFoundException.class);
 
             verify(cardRepository).findByIdForUpdate(sourceCardId);
-            verify(cardRepository, never()).findByIdForUpdate(destinationCardId);
+            verify(cardRepository).findByIdForUpdate(destinationCardId);
             verify(transferRepository, never()).save(any(Transfer.class));
-            verify(kafkaProducerService, never()).sendTransferEvent(any());
+            verify(kafkaProducerService, never()).sendTransferEventAsync(any());
         }
 
         @Test
@@ -281,7 +288,7 @@ class TransferServiceImplTest {
                     .isInstanceOf(BusinessException.class);
 
             verify(transferRepository, never()).save(any(Transfer.class));
-            verify(kafkaProducerService, never()).sendTransferEvent(any());
+            verify(kafkaProducerService, never()).sendTransferEventAsync(any());
         }
 
         @Test
@@ -304,7 +311,7 @@ class TransferServiceImplTest {
                     .isInstanceOf(BusinessException.class);
 
             verify(transferRepository, never()).save(any(Transfer.class));
-            verify(kafkaProducerService, never()).sendTransferEvent(any());
+            verify(kafkaProducerService, never()).sendTransferEventAsync(any());
         }
 
         @Test
@@ -319,7 +326,7 @@ class TransferServiceImplTest {
             verify(cardRepository).findByIdForUpdate(sourceCardId);
             verify(cardRepository).findByIdForUpdate(destinationCardId);
             verify(transferRepository, never()).save(any(Transfer.class));
-            verify(kafkaProducerService, never()).sendTransferEvent(any());
+            verify(kafkaProducerService, never()).sendTransferEventAsync(any());
         }
 
         @Test
@@ -342,7 +349,7 @@ class TransferServiceImplTest {
                     .isInstanceOf(BusinessException.class);
 
             verify(transferRepository, never()).save(any(Transfer.class));
-            verify(kafkaProducerService, never()).sendTransferEvent(any());
+            verify(kafkaProducerService, never()).sendTransferEventAsync(any());
         }
 
         @Test
@@ -365,7 +372,7 @@ class TransferServiceImplTest {
                     .isInstanceOf(BusinessException.class);
 
             verify(transferRepository, never()).save(any(Transfer.class));
-            verify(kafkaProducerService, never()).sendTransferEvent(any());
+            verify(kafkaProducerService, never()).sendTransferEventAsync(any());
         }
 
     }

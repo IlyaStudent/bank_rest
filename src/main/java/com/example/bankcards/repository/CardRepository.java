@@ -11,6 +11,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 public interface CardRepository extends JpaRepository<Card, Long> {
@@ -44,4 +46,7 @@ public interface CardRepository extends JpaRepository<Card, Long> {
             BigDecimal balance,
             Pageable pageable
     );
+
+    @Query("SELECT c FROM Card c WHERE c.status = 'ACTIVE' AND c.expiryDate < :date")
+    List<Card> findActiveCardsWithExpirationDate(@Param("date")LocalDate date);
 }
