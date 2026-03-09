@@ -25,7 +25,7 @@ public class CardExpirationScheduler {
 
     @Scheduled(cron = "0 0 2 * * *")
     @Transactional
-    private void markExpiredCards() {
+    void markExpiredCards() {
         log.info("Starting expired cards check");
 
         List<Card> expiredCards = cardRepository.findActiveCardsWithExpirationDate(LocalDate.now());

@@ -107,10 +107,13 @@ public class AuthServiceImpl implements AuthService {
 
         CompletableFuture.allOf(usernameFuture, emailFuture).join();
 
-        if (usernameFuture.join()) {
+        boolean usernameExists = usernameFuture.join();
+        boolean emailExists = emailFuture.join();
+
+        if (usernameExists) {
             throw ResourceExistsException.username(request.getUsername());
         }
-        if (emailFuture.join()) {
+        if (emailExists) {
             throw ResourceExistsException.email(request.getEmail());
         }
     }
