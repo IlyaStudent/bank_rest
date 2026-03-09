@@ -25,7 +25,7 @@ public interface CardRepository extends JpaRepository<Card, Long> {
     );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT c FROM Card c WHERE c.id=:id")
+    @Query("SELECT c FROM Card c JOIN FETCH c.owner WHERE c.id=:id")
     Optional<Card> findByIdForUpdate(@Param("id") Long id);
 
     Page<Card> findByStatus(
