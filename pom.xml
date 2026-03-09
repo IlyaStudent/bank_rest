@@ -257,6 +257,8 @@
                     <excludes>
                         <exclude>**/mapper/*Impl.class</exclude>
                         <exclude>**/BankCardsApplication.class</exclude>
+                        <exclude>**/config/*.class</exclude>
+                        <exclude>**/scheduler/*.class</exclude>
                     </excludes>
                 </configuration>
             </plugin>
